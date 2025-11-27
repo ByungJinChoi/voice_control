@@ -178,33 +178,7 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
-  /* 패널 핸들 (버튼) – 구조는 남기고, 화면에서는 숨김 */
-  #panelHandle{
-    position:absolute; top: calc(12px * var(--uiScale)); right: 0;
-    z-index:999; width: 22px; height: 28px;
-    background: var(--blue); border: 0; border-radius: calc(6px * var(--uiScale));
-    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer; padding: 0;
-  }
-  #panelHandle::before{
-    content:''; position:absolute; top:0; right:-3px;
-    width:3px; height:100%; background: var(--blue);
-    border-top-right-radius: calc(6px * var(--uiScale)); border-bottom-right-radius: calc(6px * var(--uiScale));
-  }
-  #panelHandle::after{
-    content:''; position:absolute; top:50%; transform: translateY(-50%);
-    width:0; height:0; border-style: solid;
-  }
-  #panelHandle.open::after{
-    left: 4px;
-    border-width: 6px 0 6px 7px;
-    border-color: transparent transparent transparent white;
-  }
-  #panelHandle.closed::after{
-    left: 4px;
-    border-width: 6px 7px 6px 0;
-    border-color: transparent white transparent transparent;
-  }
-  /* 👉 요청대로 파란 버튼 숨기기 */
+  /* 파란 패널 핸들: 아예 숨김 */
   #panelHandle{ display:none !important; }
 
   .blocklyZoom,.blocklyTrash{ display:block !important; }
@@ -279,12 +253,57 @@
     z-index:99999;
     transition:opacity .18s ease, transform .18s ease;
   }
+
+  /* 필드 팝업 (텍스트 박스) */
+  #xroboFieldPopup{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:99998;
+    background:rgba(0,0,0,.35);
+  }
+  #xroboFieldPopup .inner{
+    min-width:240px;
+    max-width:80vw;
+    background:#111827;
+    color:#e5e7eb;
+    border-radius:12px;
+    padding:14px 16px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5);
+  }
+  #xroboFieldPopup .title{
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  #xroboFieldPopup .value{
+    font-family:ui-monospace, Menlo, Consolas, monospace;
+    font-size:13px;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid #4b5563;
+    background:#020617;
+    word-break:break-all;
+  }
+  #xroboFieldPopup .btnClose{
+    margin-top:10px;
+    padding:4px 10px;
+    border-radius:999px;
+    border:0;
+    background:#4b5563;
+    color:#e5e7eb;
+    font-size:12px;
+    cursor:pointer;
+    float:right;
+  }
 </style>
 </head>
 <body>
 <header id="appHeader">
   <div id="topbar">
-    <div class="title">XROBO BLE — 음성 명령 디버그</div>
+    <div class="title">XROBO v11 — 음성 명령 디버그</div>
     <div class="spacer"></div>
 
     <div class="dropdown" id="fileDropdown">
@@ -309,6 +328,7 @@
 <div id="main">
   <div id="left">
     <div id="blocklyDiv"></div>
+    <!-- 파란 패널 버튼은 숨겨 두지만, 기존 코드와의 호환을 위해 DOM만 유지 -->
     <button id="panelHandle" class="open" title="실행창 닫기"></button>
   </div>
 
@@ -385,6 +405,15 @@
 
 <!-- 토스트 -->
 <div id="xroboToast"></div>
+
+<!-- 필드 팝업 -->
+<div id="xroboFieldPopup">
+  <div class="inner">
+    <div class="title">입력 필드</div>
+    <div class="value"></div>
+    <button type="button" class="btnClose">닫기</button>
+  </div>
+</div>
 
 <script>
 /* ========== Blockly 기본 세팅 ========== */
@@ -750,22 +779,6 @@ applyHeaderHeight();
   document.body.classList.remove('panel-collapsed');
 })();
 
-/* 패널 토글 (버튼은 숨겨놨지만, 로직은 그대로 둡니다) */
-var panelHandle=document.getElementById('panelHandle');
-function syncHandle(){
-  var collapsed = document.body.classList.contains('panel-collapsed');
-  panelHandle.classList.toggle('open',   !collapsed);
-  panelHandle.classList.toggle('closed',  collapsed);
-  panelHandle.title = collapsed ? '실행창 열기' : '실행창 닫기';
-}
-function togglePanel(){
-  document.body.classList.toggle('panel-collapsed');
-  syncHandle();
-  setTimeout(()=>{ Blockly.svgResize(ws); },60);
-}
-panelHandle.addEventListener('click', togglePanel);
-syncHandle();
-
 /* 전체화면 버튼 */
 var fsBtn=document.getElementById('fsBtn');
 async function enterFS(){
@@ -884,7 +897,6 @@ var eventPrograms = {};
 var queue = [];
 var queueBusy = false;
 var cancelToken = 0;
-var overlay = document.getElementById('playOverlay');
 
 function sendRaw(s){
   if(!writeChar){
@@ -933,6 +945,8 @@ function triggerEvent(key){
   var myToken = cancelToken;
   processQueue(myToken);
 }
+
+var overlay = document.getElementById('playOverlay');
 
 function startTest(){
   if(isRunning) return;
@@ -1241,10 +1255,15 @@ function loadProject(){
 })();
 </script>
 
-<!-- ========== 토스트 + 키보드 막기 ========== -->
+<!-- ========== 토스트 + 필드 클릭 디버깅 (키보드 완전 차단) ========== -->
 <script>
 (function(){
   const toastEl = document.getElementById('xroboToast');
+  const popupEl = document.getElementById('xroboFieldPopup');
+  const popTitle = popupEl ? popupEl.querySelector('.title') : null;
+  const popValue = popupEl ? popupEl.querySelector('.value') : null;
+  const popClose = popupEl ? popupEl.querySelector('.btnClose') : null;
+
   function showToast(msg){
     if(!toastEl) return;
     toastEl.textContent = msg;
@@ -1258,77 +1277,72 @@ function loadProject(){
   }
   window.xroboShowToast = showToast;
 
-  function disableOsKeyboardForCurrentInput(){
+  function openPopup(kind, field){
+    if(!popupEl || !popTitle || !popValue) return;
+    popTitle.textContent = (kind === 'text') ? '텍스트 입력 필드' : '숫자 입력 필드';
+
+    let val = '';
     try{
-      const input =
-        (Blockly.FieldTextInput && Blockly.FieldTextInput.htmlInput_) ||
-        (Blockly.WidgetDiv && Blockly.WidgetDiv.DIV &&
-         Blockly.WidgetDiv.DIV.querySelector('input,textarea'));
-      if(!input) return;
-
-      // OS 키보드가 뜨지 않도록 막기
-      input.setAttribute('readonly','readonly');
-      input.setAttribute('inputmode','none');
-      input.setAttribute('autocomplete','off');
-      input.setAttribute('autocorrect','off');
-      input.setAttribute('autocapitalize','off');
-      input.setAttribute('spellcheck','false');
-
-      // 혹시 포커스되면 바로 blur 해서 키보드가 안 뜨게 함
-      setTimeout(()=>{ try{ input.blur(); }catch(e){} }, 0);
+      if(field && typeof field.getValue === 'function'){
+        val = String(field.getValue() ?? '');
+      }
     }catch(e){}
+    popValue.textContent = val;
+
+    popupEl.style.display = 'flex';
   }
 
-  function patchFields(){
+  if(popClose){
+    popClose.addEventListener('click', ()=>{ popupEl.style.display = 'none'; });
+  }
+  if(popupEl){
+    popupEl.addEventListener('click', (e)=>{
+      if(e.target === popupEl) popupEl.style.display = 'none';
+    });
+  }
+
+  function patch(){
     if(!window.Blockly || !Blockly.FieldTextInput) return;
     var TextProto = Blockly.FieldTextInput.prototype;
-    if(TextProto.__xrobo_toast_noKb_patched) return;
+    if(TextProto.__xrobo_no_keyboard_patched) return;
 
-    var NumberProto   = Blockly.FieldNumber   && Blockly.FieldNumber.prototype;
-    var DropdownProto = Blockly.FieldDropdown && Blockly.FieldDropdown.prototype;
+    var NumberProto = Blockly.FieldNumber && Blockly.FieldNumber.prototype;
 
-    // 텍스트 필드 (이벤트 블록 등)
-    var origTextShow = TextProto.showEditor_;
+    // 텍스트 필드 전용 후크
     TextProto.showEditor_ = function(){
-      // FieldNumber는 아래에서 따로 처리
-      if(!(Blockly.FieldNumber && this instanceof Blockly.FieldNumber)){
+      var block = this.getSourceBlock && this.getSourceBlock();
+      var isEventText = block && (block.type === 'xvoice_start' || block.type === 'xvoice_test');
+
+      if(isEventText){
         showToast('텍스트 입력을 누르셨습니다.');
+        openPopup('text', this);
+      }else{
+        showToast('숫자 입력을 누르셨습니다.');
+        openPopup('number', this);
       }
-      var rv = origTextShow ? origTextShow.apply(this, arguments) : undefined;
-      disableOsKeyboardForCurrentInput();
-      return rv;
+      // ★ 원래의 showEditor_를 호출하지 않음
+      // htmlInput을 만들지 않기 때문에 OS 키보드가 뜨지 않습니다.
     };
 
-    // 숫자 필드
+    // 숫자 필드(FieldNumber)
     if(NumberProto){
-      var origNumShow = NumberProto.showEditor_;
       NumberProto.showEditor_ = function(){
         showToast('숫자 입력을 누르셨습니다.');
-        var rv = origNumShow ? origNumShow.apply(this, arguments) : undefined;
-        disableOsKeyboardForCurrentInput();
-        return rv;
+        openPopup('number', this);
+        // 여기서도 원래 편집기를 열지 않습니다.
       };
     }
 
-    // 드롭다운도 숫자 입력 느낌으로 안내 (모터 20, 500ms 같은 곳)
-    if(DropdownProto){
-      var origDropShow = DropdownProto.showEditor_;
-      DropdownProto.showEditor_ = function(){
-        showToast('숫자 입력을 누르셨습니다.');
-        return origDropShow ? origDropShow.apply(this, arguments) : undefined;
-      };
-    }
-
-    TextProto.__xrobo_toast_noKb_patched = true;
+    TextProto.__xrobo_no_keyboard_patched = true;
   }
 
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', patchFields);
+    document.addEventListener('DOMContentLoaded', patch);
   }else{
-    patchFields();
+    patch();
   }
   // Blockly 로딩 지연 대비
-  setTimeout(patchFields, 1000);
+  setTimeout(patch, 1000);
 })();
 </script>
 
