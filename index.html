@@ -35,7 +35,6 @@
     --keyGap: 6px;
     --keyFont: 14px;
 
-    /* 눈(전체화면 오버레이) */
     --eyesGap: 8vmin;
     --eyeSize: 42vmin;
     --pupilSize: 16vmin;
@@ -193,7 +192,6 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
-  /* 실행창 토글 핸들 (지금은 숨김) */
   #panelHandle{
     position:absolute; top: calc(12px * var(--uiScale)); right: 0;
     z-index:999; width: var(--handleW); height: var(--handleH);
@@ -269,7 +267,6 @@
   .blink .eyelid{ animation: blink var(--blinkSpeed) ease-in-out forwards; }
   @keyframes blink{ 0%{transform:scaleY(0)} 45%{transform:scaleY(1)} 100%{transform:scaleY(0)} }
 
-  /* 전체화면 음성 배지 */
   #overlayDigitBadge{
     position: fixed; left:50%; transform:translateX(-50%);
     bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 10001;
@@ -283,7 +280,6 @@
     box-shadow: 0 0 0 2px rgba(255,255,255,.18) inset;
   }
 
-  /* === 파일 드롭다운 === */
   .dropdown{ position:relative; }
   .dropdown .menu{
     position:absolute; right:0; top:calc(100% + 4px);
@@ -303,7 +299,7 @@
 </style>
 
 <style id="xrobo-hsplit-style">
-  :root{ --rightW: 40%; } /* initial right width */
+  :root{ --rightW: 40%; }
   #hResizer{
     flex: 0 0 8px;
     background: linear-gradient(90deg,#e5e7eb,#d1d5db);
@@ -449,7 +445,7 @@
     </category>
   </xml>
 
-  <!-- 전체화면 오버레이: 눈동자 (카메라 없이 포인터만 따라감) -->
+  <!-- 전체화면 오버레이: 눈동자 -->
   <div id="playOverlay" aria-hidden="true">
     <div class="body">
       <div id="eyesStage" aria-label="귀여운 눈동자">
@@ -670,7 +666,7 @@ function normalizeProgram(list){
   return out;
 }
 
-/* 트리거 문자열 정규화: 공백/기호 제거 + 소문자 */
+/* 트리거 문자열 정규화 */
 function normalizeTrigger(str){
   return (str || '')
     .toLowerCase()
@@ -679,9 +675,9 @@ function normalizeTrigger(str){
     .trim();
 }
 
-/* 워크스페이스에서 이벤트 프로그램 빌드 (문장 → 명령 리스트) */
+/* 워크스페이스에서 이벤트 프로그램 빌드 */
 function buildEventPrograms(){
-  var map = {}; // key -> { label, list }
+  var map = {};
   var evs = ws.getBlocksByType('xrobo_start', true);
   for(var i=0;i<evs.length;i++){
     var block = evs[i];
@@ -750,7 +746,6 @@ function setRunning(v){
   btnTest.disabled = v;
 }
 
-/* BLE connect/disconnect */
 function connectBLE(){
   if(!navigator.bluetooth){ alert('이 브라우저는 Web Bluetooth 미지원입니다.'); return; }
   (async function(){
@@ -957,7 +952,7 @@ document.addEventListener('fullscreenchange', syncFSLabel);
 syncFSLabel();
 
 /* ================= 실행/큐 & 이벤트 매핑 ================= */
-var eventPrograms = {}; // key -> { label, list }
+var eventPrograms = {};
 var queue = [];
 var queueBusy = false;
 var cancelToken = 0;
@@ -1001,7 +996,6 @@ async function processQueue(localToken){
   }
 }
 
-/* 음성 인식으로 트리거된 이벤트 실행 */
 function triggerEvent(key){
   if(!isRunning) return;
   var entry = eventPrograms[key];
@@ -1012,7 +1006,7 @@ function triggerEvent(key){
   processQueue(myToken);
 }
 
-/* 테스트 실행 (코딩 화면) */
+/* 테스트 실행 */
 function startTest(){
   if(isRunning) return;
   eventPrograms = buildEventPrograms();
@@ -1022,7 +1016,7 @@ function startTest(){
   log('▶ 테스트 실행 준비 완료 (음성 명령 대기)');
 }
 
-/* 전체화면 실행 (눈동자 + 음성) */
+/* 전체화면 실행 */
 var overlay = document.getElementById('playOverlay');
 async function startFullRun(){
   if(isRunning) return;
@@ -1056,11 +1050,9 @@ async function stopRun(){
   }catch(e){}
 }
 
-/* 버튼 바인딩 */
 btnTest.onclick = ()=> { if(!isRunning) startTest(); };
 btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
 
-/* 전체화면 해제 시 실행 중이면 정지 처리 */
 document.addEventListener('fullscreenchange', ()=>{
   if (isFullscreenRun && !document.fullscreenElement){
     stopRun();
@@ -1070,7 +1062,7 @@ document.addEventListener('keydown', (e)=>{
   if (isFullscreenRun && e.key === 'Escape') stopRun();
 });
 
-/* ================= 음성 인식 (Web Speech API) ================= */
+/* ================= 음성 인식 ================= */
 var voiceBtn = document.getElementById('voiceBtn');
 var voiceStatus = document.getElementById('voiceStatus');
 var voiceText = document.getElementById('voiceText');
@@ -1169,7 +1161,6 @@ function startVoiceRecognition(){
 }
 voiceBtn.addEventListener('click', startVoiceRecognition);
 
-/* 음성 결과 → 이벤트 매칭 */
 function handleVoiceCommand(text){
   var key = normalizeTrigger(text);
   if(!key){
@@ -1178,7 +1169,6 @@ function handleVoiceCommand(text){
   }
   log('🎙 인식 문장: "'+ text + '"');
 
-  // 실행 준비가 안 되어 있으면 안내만
   if(!isRunning){
     log('ℹ️ 아직 실행 모드가 아닙니다. [테스트] 또는 [실행] 버튼을 먼저 눌러 주세요.');
     return;
@@ -1188,7 +1178,6 @@ function handleVoiceCommand(text){
   for(var k in eventPrograms){
     if(!Object.prototype.hasOwnProperty.call(eventPrograms,k)) continue;
     if(!k) continue;
-    // 완전 일치 또는 포함 관계면 매칭
     if(key === k || key.indexOf(k) >= 0 || k.indexOf(key) >= 0){
       hits.push(k);
     }
@@ -1202,7 +1191,7 @@ function handleVoiceCommand(text){
   hits.forEach(triggerEvent);
 }
 
-/* ================= 전체화면 눈동자 (카메라 없이 포인터 기준) ================= */
+/* ================= 전체화면 눈동자 ================= */
 var ovEyes = [].slice.call(document.querySelectorAll('#playOverlay .eye'));
 var ovPupils = [].slice.call(document.querySelectorAll('#playOverlay .pupil'));
 var overlayBadge = document.getElementById('overlayDigitBadge');
@@ -1230,7 +1219,6 @@ function renderPupils(nx, ny){
       'translate(calc(-50% + '+dx+'px), calc(-50% + '+dy+'px))';
   });
 }
-
 function scheduleOverlayBlink(){
   clearTimeout(overlayBlinkTimer);
   var t = 2200 + Math.random()*3300;
@@ -1244,7 +1232,6 @@ function scheduleOverlayBlink(){
     scheduleOverlayBlink();
   }, t);
 }
-
 function handleOverlayPointer(e){
   var pt = ('touches' in e && e.touches[0]) ? e.touches[0] : e;
   var cx = window.innerWidth/2;
@@ -1255,7 +1242,6 @@ function handleOverlayPointer(e){
   ovTarget.x = Math.max(-1, Math.min(1, dx/(d*0.25)));
   ovTarget.y = Math.max(-1, Math.min(1, dy/(d*0.25)));
 }
-
 function onOverlayPointerDown(e){
   handleOverlayPointer(e);
   var now = e.timeStamp || Date.now();
@@ -1269,7 +1255,6 @@ function onOverlayPointerDown(e){
 function onOverlayDblClick(){
   stopRun();
 }
-
 function startOverlayEyes(){
   if(eyesRAF) cancelAnimationFrame(eyesRAF);
   scheduleOverlayBlink();
@@ -1298,15 +1283,11 @@ function stopOverlayEyes(){
   overlay.removeEventListener('dblclick', onOverlayDblClick);
   overlayBadge.style.display='none';
 }
-
-/* 전체화면 배지에 마지막 음성 표시 */
 function showOverlayPhrase(text, matched){
   if(!isFullscreenRun) return;
   overlayBadgeValue.textContent = text;
   overlayBadge.style.display='inline-flex';
 }
-
-/* ================= 끝 ================= */
 </script>
 
 <script id="xrobo-hsplit-script">
@@ -1323,14 +1304,12 @@ function showOverlayPhrase(text, matched){
   var maxW = 0;
 
   function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
   function computeMax(){
     var rect = main.getBoundingClientRect();
     var barW = res.getBoundingClientRect().width || 8;
     maxW = Math.max(0, rect.width - barW);
     return maxW;
   }
-
   function onDown(clientX){
     dragging = true;
     startX = clientX;
@@ -1338,7 +1317,6 @@ function showOverlayPhrase(text, matched){
     computeMax();
     document.body.classList.add('hs-resizing');
   }
-
   function applyWidth(newW){
     newW = clamp(newW, 0, maxW);
     document.documentElement.style.setProperty('--rightW', newW + 'px');
@@ -1351,14 +1329,12 @@ function showOverlayPhrase(text, matched){
       }catch(e){}
     });
   }
-
   function onMove(clientX){
     if(!dragging) return;
     var dx = clientX - startX;
     var newW = startW - dx;
     applyWidth(newW);
   }
-
   function onUp(){
     dragging = false;
     document.body.classList.remove('hs-resizing');
@@ -1388,7 +1364,7 @@ function showOverlayPhrase(text, matched){
   });
 })();
 
-/* === 파일 드롭다운 로직(저장/불러오기) === */
+/* 파일 드롭다운 */
 (function(){
   var btn  = document.getElementById('fileBtn');
   var menu = document.getElementById('fileMenu');
@@ -1416,7 +1392,7 @@ function showOverlayPhrase(text, matched){
   });
 })();
 
-/* === 새로만들기 === */
+/* 새로만들기 */
 (function(){
   var menu = document.getElementById('fileMenu');
   if(!menu) return;
@@ -1447,7 +1423,7 @@ function showOverlayPhrase(text, matched){
 </script>
 
 <script id="xrobo-kp4x4-v14-script">
-/* (원본과 동일: 안드로이드 전용 숫자 키패드) */
+/* 안드로이드 숫자 키패드 (이벤트 블록 텍스트는 건드리지 않음!) */
 (function(){
   if(!/Android/i.test(navigator.userAgent||'')) { return; }
 
@@ -1499,9 +1475,12 @@ function showOverlayPhrase(text, matched){
     if(pad) return pad;
     pad = document.createElement('div');
     pad.id = 'xrobo-kp4x4-v14';
-    pad.innerHTML = '<div class="display" aria-live="polite"></div><div class="grid" role="group" aria-label="숫자패드"></div>';
+    pad.innerHTML =
+      '<div class="display" aria-live="polite"></div>'+
+      '<div class="grid" role="group" aria-label="숫자패드"></div>';
     document.body.appendChild(pad);
-    disp = pad.querySelector('.display'); grid = pad.querySelector('.grid');
+    disp = pad.querySelector('.display');
+    grid = pad.querySelector('.grid');
 
     const layout = [
       {t:'1'},{t:'2'},{t:'3'},{t:'←',cls:'back'},
@@ -1511,7 +1490,9 @@ function showOverlayPhrase(text, matched){
       {t:'확인',cls:'wide ok'},{t:'취소',cls:'wide cancel'}
     ];
     layout.forEach(k=>{
-      const b=document.createElement('button'); b.type='button'; b.textContent=k.t;
+      const b=document.createElement('button');
+      b.type='button';
+      b.textContent=k.t;
       if(k.cls) k.cls.split(' ').forEach(c=>b.classList.add(c));
       grid.appendChild(b);
     });
@@ -1522,7 +1503,6 @@ function showOverlayPhrase(text, matched){
         return;
       }
       lastPressLabel = label; lastPressTime = now;
-
       if(label==='확인'){ commit(); return; }
       if(label==='취소'){ cancel(); return; }
       if(label==='C'){ buffer=''; sync(); return; }
@@ -1573,7 +1553,6 @@ function showOverlayPhrase(text, matched){
       }
       outsideBound = true;
     }
-
     return pad;
   }
   function showPad(){ buildPad().classList.add('show'); }
@@ -1587,13 +1566,15 @@ function showOverlayPhrase(text, matched){
     if(left + pw > vx + innerWidth - 6){ left = r.left + vx - pw - gap; }
     if(top + ph > vy + innerHeight - 6){ top = Math.max(vy+6, vy + innerHeight - ph - 6); }
     if(top < vy + 6) top = vy + 6;
-    pad.style.left = left + 'px'; pad.style.top = top + 'px';
+    pad.style.left = left + 'px';
+    pad.style.top = top + 'px';
   }
   function positionNearInput(input){ positionNearRect(input.getBoundingClientRect()); }
   function positionNearPoint(x,y){ positionNearRect({left:x, right:x, top:y, bottom:y, width:0, height:0}); }
   function positionNearField(field){
     try{
-      const root = field && field.getClickTarget_ ? field.getClickTarget_() : (field && field.getSvgRoot && field.getSvgRoot());
+      const root = field && field.getClickTarget_ ? field.getClickTarget_() :
+                   (field && field.getSvgRoot && field.getSvgRoot());
       if(root && root.getBoundingClientRect){
         positionNearRect(root.getBoundingClientRect());
         return true;
@@ -1690,20 +1671,13 @@ function showOverlayPhrase(text, matched){
   }
 
   function setupInputPlatform(input){
-    if(isAndroid){
-      input.setAttribute('readonly', 'readonly');
-      input.setAttribute('inputmode','none');
-      input.addEventListener('touchstart', ev=>{ ev.preventDefault(); ev.stopPropagation(); }, {capture:true, passive:false});
-      setTimeout(()=>{ try{ input.blur(); }catch(_){ } }, 0);
-    }else{
-      input.removeAttribute('readonly');
-      input.setAttribute('inputmode','numeric');
-      try{ input.focus(); }catch(_){}
-      input.addEventListener('keydown', function(e){
-        if(e.key==='Enter'){ e.preventDefault(); commit(); }
-        else if(e.key==='Escape'){ e.preventDefault(); cancel(); }
-      }, {once:true, capture:true});
-    }
+    input.setAttribute('readonly','readonly');
+    input.setAttribute('inputmode','none');
+    input.addEventListener('touchstart', ev=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+    }, {capture:true, passive:false});
+    setTimeout(()=>{ try{ input.blur(); }catch(_){ } }, 0);
     input.setAttribute('pattern','[0-9+\\-*/]*');
     input.setAttribute('autocomplete','off');
     input.setAttribute('autocorrect','off');
@@ -1752,8 +1726,8 @@ function showOverlayPhrase(text, matched){
     if(adopt()) return;
     openForField(field);
     let tries = 0;
-    const iv = setInterval(()=>{
-      if(adopt() || ++tries > 8){ clearInterval(iv); }
+    const iv=setInterval(()=>{
+      if(adopt() || ++tries > 8) clearInterval(iv);
     }, 50);
   }
 
@@ -1834,32 +1808,34 @@ function showOverlayPhrase(text, matched){
     }catch(_){}
   }
 
+  /* ★ 여기서 수정: blocklyHtmlInput 은 더 이상 가로채지 않음 (이벤트 블록 텍스트는 기본 키보드 사용) */
   document.addEventListener('focusin', function(e){
     const t = e.target;
     if(!t) return;
+
+    // Blockly 에디터의 텍스트 input 은 건드리지 않는다
     if(t.classList && (t.classList.contains('blocklyHtmlInput') || t.classList.contains('blocklyHtmlTextInput'))){
-      openForInput(t, null);
-      const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
-      t.addEventListener('blur', onBlur);
-    } else {
-      try{
-        const uaOk = /Android/i.test(navigator.userAgent||'');
-        if(uaOk && t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
-          try{
-            t.setAttribute('inputmode','none');
-            t.setAttribute('autocomplete','off');
-            t.setAttribute('autocorrect','off');
-          }catch(_){}
-          try{
-            t.setAttribute('readonly','readonly');
-            setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0);
-          }catch(_){}
-          openForInput(t, null);
-          const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
-          t.addEventListener('blur', onBlur);
-        }
-      }catch(_){}
+      return;
     }
+
+    // 나머지(예: 서보 속도 입력창)는 기존처럼 숫자패드 사용
+    try{
+      const uaOk = /Android/i.test(navigator.userAgent||'');
+      if(uaOk && t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
+        try{
+          t.setAttribute('inputmode','none');
+          t.setAttribute('autocomplete','off');
+          t.setAttribute('autocorrect','off');
+        }catch(_){}
+        try{
+          t.setAttribute('readonly','readonly');
+          setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0);
+        }catch(_){}
+        openForInput(t, null);
+        const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
+        t.addEventListener('blur', onBlur);
+      }
+    }catch(_){}
   }, true);
 
   (function(){
