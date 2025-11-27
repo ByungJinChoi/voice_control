@@ -254,7 +254,7 @@
 </style>
 
 <style id="xrobo-hsplit-style">
-  :root{ --rightW: 40%; } /* initial right width */
+  :root{ --rightW: 40%; }
   #hResizer{
     flex: 0 0 8px;
     background: linear-gradient(90deg,#e5e7eb,#d1d5db);
@@ -271,7 +271,6 @@
   #panelHandle { display: none !important; }
 </style>
 
-<!-- 숫자패드 UI 스타일 (기존 XROBO 코드) -->
 <style id="xrobo-kp4x4-v14-style">
   :root { --xroboKpScale: .7; }
   #xrobo-kp4x4-v14{
@@ -311,7 +310,7 @@
   <!-- 헤더 -->
   <header id="appHeader">
     <div id="topbar">
-      <div class="title">XROBO v6 — 음성 명령</div>
+      <div class="title">XROBO BLE — 음성 명령</div>
       <div class="spacer"></div>
 
       <!-- 파일 드롭다운 -->
@@ -1049,6 +1048,7 @@ function updateVoiceUI(state, msg){
     else if(state === 'done')      overlayVoiceStatus.textContent = '인식 완료';
     else if(state === 'error')     overlayVoiceStatus.textContent = '오류';
   }
+
   if(typeof msg === 'string'){
     if(voiceText) voiceText.textContent = msg;
     if(overlayVoiceText) overlayVoiceText.textContent = msg;
@@ -1175,15 +1175,21 @@ function handleVoiceCommand(text){
   }
   if(!hits.length){
     log('❔ "'+ text + '" 에 해당하는 이벤트 블록을 찾지 못했습니다.');
-    if(overlayVoiceText) overlayVoiceText.textContent = text;
+    showOverlayPhrase(text, false);
     return;
   }
-  if(overlayVoiceText) overlayVoiceText.textContent = text;
+  showOverlayPhrase(text, true);
   hits.forEach(triggerEvent);
+}
+
+function showOverlayPhrase(text, matched){
+  if(!isFullscreenRun) return;
+  if(overlayVoiceText){
+    overlayVoiceText.textContent = text;
+  }
 }
 </script>
 
-<!-- 좌우 리사이저 & 파일 메뉴 로직 -->
 <script id="xrobo-hsplit-script">
 (function(){
   var res = document.getElementById('hResizer');
@@ -1219,7 +1225,11 @@ function handleVoiceCommand(text){
     document.documentElement.style.setProperty('--rightW', newW + 'px');
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(function(){
-      try{ if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) { Blockly.svgResize(ws); } }catch(e){}
+      try{
+        if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) {
+          Blockly.svgResize(ws);
+        }
+      }catch(e){}
     });
   }
 
@@ -1286,10 +1296,8 @@ function handleVoiceCommand(text){
     menu.setAttribute('aria-hidden','true');
   });
 })();
-</script>
 
-<!-- === 새로만들기 전용 안전 바인딩 === -->
-<script>
+/* === 새로만들기 === */
 (function(){
   var menu = document.getElementById('fileMenu');
   if(!menu) return;
@@ -1302,7 +1310,10 @@ function handleVoiceCommand(text){
       if (typeof ws !== 'undefined' && ws && typeof ws.clear === 'function'){
         if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
           try{ ws.clear(); }catch(_){}
-          try{ if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs && typeof multiServoConfigs.clear==='function') multiServoConfigs.clear(); }catch(_){}
+          try{
+            if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs &&
+               typeof multiServoConfigs.clear==='function') multiServoConfigs.clear();
+          }catch(_){}
           try{ if(typeof refreshCodeDebounced === 'function') refreshCodeDebounced(); }catch(_){}
           try{ if(typeof log === 'function') log('🆕 새 프로젝트'); }catch(_){}
         }
@@ -1316,33 +1327,26 @@ function handleVoiceCommand(text){
 })();
 </script>
 
-<!-- === 안드로이드 숫자패드 (원본 + 이벤트 블록 예외 처리) === -->
+<!-- === Android용 4x4 숫자 키패드 + 이벤트/숫자 필드 구분 팝업 === -->
 <script id="xrobo-kp4x4-v14-script">
 (function(){
-  // Android 에서만 동작
-  if(!/Android/i.test(navigator.userAgent||'')) { return; }
+  // 안드로이드에서만 동작 (PC에서는 그대로 OS 키보드)
+  if(!/Android/i.test(navigator.userAgent||'')) return;
 
   'use strict';
-  const isAndroid = /Android/i.test(navigator.userAgent||'');
-  if(!isAndroid){ return; }
   const hasPointer = 'PointerEvent' in window;
 
   let pad, disp, grid;
-  let activeInput = null;     // html input (if captured)
-  let activeField = null;     // Blockly field instance
-  let promptCallback = null;
+  let activeInput = null;
   let buffer = '';
   let rafId = 0;
-  let lastAnchor = {x: window.innerWidth/2, y: 140};
   let outsideBound = false;
   let committing = false;
-
-  // press dedup
   let lastPressLabel = '';
   let lastPressTime = 0;
   const PRESS_DEBOUNCE_MS = 160;
 
-  // 현재 편집 중인 Blockly 필드 (이벤트/숫자 구분용)
+  // 현재 열려 있는 Blockly 필드 (이벤트 vs 숫자 구분용)
   let currentField = null;
 
   function safeEval(expr){
@@ -1356,18 +1360,27 @@ function handleVoiceCommand(text){
     function prec(op){ return (op==='*'||op==='/')?2:1; }
     function apply(){
       const op=ops.pop(), b=values.pop(), a=values.pop();
-      values.push(op==='+'?a+b: op==='-'?a-b: op==='*'?a*b: (b===0?0:Math.trunc(a/b)));
+      values.push(
+        op==='+'?a+b:
+        op==='-'?a-b:
+        op==='*'?a*b:
+        (b===0?0:Math.trunc(a/b))
+      );
     }
     for(const tk of tokens){
       if(/^\d+$/.test(tk)){
-        let v=parseInt(tk,10); if(unary==='-') v=-v;
-        unary=null; values.push(v); expectNum=false;
+        let v=parseInt(tk,10);
+        if(unary==='-') v=-v;
+        unary=null;
+        values.push(v);
+        expectNum=false;
       }else{
         if(expectNum){
           if(tk==='+'||tk==='-') unary=tk;
         }else{
           while(ops.length && prec(ops[ops.length-1])>=prec(tk)) apply();
-          ops.push(tk); expectNum=true;
+          ops.push(tk);
+          expectNum=true;
         }
       }
     }
@@ -1379,7 +1392,6 @@ function handleVoiceCommand(text){
     try{ el.dispatchEvent(new Event(type, {bubbles:true})); }catch(_){}
   }
 
-  /* ===== keypad UI ===== */
   function buildPad(){
     if(pad) return pad;
     pad = document.createElement('div');
@@ -1411,7 +1423,8 @@ function handleVoiceCommand(text){
       if(label === lastPressLabel && (now - lastPressTime) < PRESS_DEBOUNCE_MS){
         return;
       }
-      lastPressLabel = label; lastPressTime = now;
+      lastPressLabel = label;
+      lastPressTime = now;
 
       if(label==='확인'){ commit(); return; }
       if(label==='취소'){ cancel(); return; }
@@ -1482,17 +1495,6 @@ function handleVoiceCommand(text){
     pad.style.top = top + 'px';
   }
   function positionNearInput(input){ positionNearRect(input.getBoundingClientRect()); }
-  function positionNearPoint(x,y){ positionNearRect({left:x, right:x, top:y, bottom:y, width:0, height:0}); }
-  function positionNearField(field){
-    try{
-      const root = field && field.getClickTarget_ ? field.getClickTarget_() : (field && field.getSvgRoot && field.getSvgRoot());
-      if(root && root.getBoundingClientRect){
-        positionNearRect(root.getBoundingClientRect());
-        return true;
-      }
-    }catch(_){}
-    return false;
-  }
 
   function startFollowInput(input){
     cancelAnimationFrame(rafId);
@@ -1517,8 +1519,8 @@ function handleVoiceCommand(text){
   function evaluateAndClamp(raw, inputEl){
     let num = safeEval(String(raw||'').trim());
     if(!Number.isFinite(num)) return { ok:false, val:String(raw||'') };
-    const min = Number(inputEl?.getAttribute && inputEl.getAttribute('min'));
-    const max = Number(inputEl?.getAttribute && inputEl.getAttribute('max'));
+    const min = Number(inputEl && inputEl.getAttribute && inputEl.getAttribute('min'));
+    const max = Number(inputEl && inputEl.getAttribute && inputEl.getAttribute('max'));
     if(Number.isFinite(min)) num = Math.max(min, num);
     if(Number.isFinite(max)) num = Math.min(max, num);
     return { ok:true, val:String(num) };
@@ -1528,29 +1530,12 @@ function handleVoiceCommand(text){
     if(committing) return;
     committing = true;
     try{
-      if(activeField && !activeInput){
-        const { ok, val } = evaluateAndClamp(buffer, null);
-        try{ activeField.setValue(ok ? val : buffer); }catch(_){}
-        activeField = null;
-      }else if(activeField && activeInput){
-        const { ok, val } = evaluateAndClamp(buffer, activeInput);
-        try{ activeField.setValue(ok ? val : buffer); }catch(_){}
-        activeField = null;
-      }else if(typeof promptCallback === 'function'){
-        const n = safeEval(buffer); const v = Number.isFinite(n) ? String(n) : buffer;
-        try{ promptCallback(v); }catch(_){}
-        promptCallback = null;
-      }else if(activeInput){
+      if(activeInput){
         const { ok, val } = evaluateAndClamp(buffer, activeInput);
         activeInput.value = val;
         dispatch(activeInput,'input');
         dispatch(activeInput,'change');
       }
-      try{
-        if(window.Blockly && Blockly.WidgetDiv && typeof Blockly.WidgetDiv.hide==='function'){
-          Blockly.WidgetDiv.hide();
-        }
-      }catch(_){}
       activeInput = null;
       stopFollow(); hidePad();
     }finally{
@@ -1559,22 +1544,25 @@ function handleVoiceCommand(text){
   }
 
   function cancel(){
-    activeField = null; promptCallback = null; activeInput = null;
+    activeInput = null;
     stopFollow(); hidePad();
   }
 
-  function openForInput(input, field){
-    activeInput = input; activeField = field || null; promptCallback = null;
+  function openForInput(input){
+    activeInput = input;
     buffer = String(input.value||'');
 
-    input.setAttribute('readonly', 'readonly');
+    input.setAttribute('readonly','readonly');
     input.setAttribute('inputmode','none');
-    input.setAttribute('pattern','[0-9+\\-*/]*');
     input.setAttribute('autocomplete','off');
     input.setAttribute('autocorrect','off');
     input.setAttribute('autocapitalize','off');
     input.setAttribute('spellcheck','false');
-    input.addEventListener('touchstart', ev=>{ ev.preventDefault(); ev.stopPropagation(); }, {capture:true, passive:false});
+
+    input.addEventListener('touchstart', function handler(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+    }, {capture:true, passive:false});
 
     showPad();
     positionNearInput(input);
@@ -1582,222 +1570,87 @@ function handleVoiceCommand(text){
     sync();
   }
 
-  function openForField(field){
-    activeField = field || null; activeInput = null; promptCallback = null;
-    buffer = (field && typeof field.getValue==='function') ? String(field.getValue()||'') : '';
-    showPad();
-    if(!positionNearField(field)){
-      positionNearPoint(lastAnchor.x, lastAnchor.y);
-    }
-    sync();
-  }
-
-  function openForPrompt(defVal, anchor){
-    activeInput = null; activeField = null;
-    buffer = String(defVal||'');
-    showPad(); positionNearPoint(anchor.x, anchor.y); sync();
-  }
-
-  /* ===== discover Blockly input ===== */
-  function findBlocklyInput(){
+  /* === Blockly 필드 추적 (어떤 블록/필드인지 알아내기) === */
+  function patchFieldTracking(){
     try{
-      if(window.Blockly){
-        if(Blockly.FieldTextInput && Blockly.FieldTextInput.htmlInput_){
-          return Blockly.FieldTextInput.htmlInput_;
-        }
-        if(Blockly.WidgetDiv && Blockly.WidgetDiv.DIV){
-          const el = Blockly.WidgetDiv.DIV.querySelector('input,textarea');
-          if(el) return el;
-        }
-      }
-      const q = document.querySelector('.blocklyHtmlInput, .blocklyHtmlTextInput, input.blocklyHtmlInput');
-      if(q) return q;
-    }catch(_){}
-    return null;
-  }
-
-  /* ===== hooks ===== */
-  function afterEditorOpened(field){
-    let found = false;
-    const adopt = ()=>{
-      const input = findBlocklyInput();
-      if(input){
-        openForInput(input, field);
-        found = true;
-        return true;
-      }
-      return false;
-    };
-    if(adopt()) return;
-    openForField(field);
-    let tries = 0;
-    const iv = setInterval(()=>{
-      if(adopt() || ++tries > 8) clearInterval(iv);
-    }, 50);
-  }
-
-  function patchFieldNumber(){
-    try{
-      if(!window.Blockly || !Blockly.FieldNumber || Blockly.FieldNumber.__xrobo_v14) return;
-      function wrap(name){
-        const orig = Blockly.FieldNumber.prototype[name];
-        if(!orig) return false;
-        Blockly.FieldNumber.prototype[name] = function(){
-          const rv = orig.apply(this, arguments);
-          const self = this;
-          setTimeout(()=> afterEditorOpened(self), 0);
-          return rv;
+      if(window.Blockly && Blockly.FieldTextInput && !Blockly.FieldTextInput.__xrobo_track){
+        const proto = Blockly.FieldTextInput.prototype;
+        const origShow = proto.showEditor_;
+        proto.showEditor_ = function(opt_e){
+          currentField = this;
+          return origShow ? origShow.apply(this, arguments) : undefined;
         };
-        return true;
+        Blockly.FieldTextInput.__xrobo_track = true;
       }
-      wrap('showEditor_') || wrap('showEditor');
-      Blockly.FieldNumber.__xrobo_v14 = true;
     }catch(_){}
-  }
-
-  function patchFieldTextInput(){
     try{
-      if(!window.Blockly || !Blockly.FieldTextInput || Blockly.FieldTextInput.__xrobo_v14) return;
-      const proto = Blockly.FieldTextInput.prototype;
-      const origShow = proto.showEditor_;
-      proto.showEditor_ = function(opt_e){
-        // 어떤 필드가 열렸는지 기억
-        currentField = this;
-        const rv = origShow ? origShow.apply(this, arguments) : undefined;
-        // 숫자 필드(FieldNumber)인 경우 기존 로직 유지
-        if((typeof Blockly.FieldNumber!=='undefined') && (this instanceof Blockly.FieldNumber)){
-          const self = this;
-          setTimeout(()=> afterEditorOpened(self), 0);
-        }
-        return rv;
-      };
-      const origPrompt = proto.showPromptEditor_;
-      if(typeof origPrompt === 'function'){
-        proto.showPromptEditor_ = function(){
-          if((typeof Blockly.FieldNumber!=='undefined') && (this instanceof Blockly.FieldNumber)){
-            openForPrompt(this.getValue ? this.getValue() : '', lastAnchor);
-            return;
-          }
-          return origPrompt.apply(this, arguments);
+      if(window.Blockly && Blockly.FieldNumber && !Blockly.FieldNumber.__xrobo_track){
+        const proto = Blockly.FieldNumber.prototype;
+        const origShow = proto.showEditor_;
+        proto.showEditor_ = function(opt_e){
+          currentField = this;
+          return origShow ? origShow.apply(this, arguments) : undefined;
         };
-      }
-      Blockly.FieldTextInput.__xrobo_v14 = true;
-    }catch(_){}
-  }
-
-  function patchPrompt(){
-    try{
-      if(!window.Blockly) return;
-      const numLike = v => /^[\s]*[+\-]?\d+(?:[\s]*[+\-*/][\s]*[+\-]?\d+)*[\s]*$/.test(String(v||''));
-      if(Blockly.dialog && typeof Blockly.dialog.setPrompt==='function' && !Blockly.dialog.__xrobo_v14){
-        Blockly.dialog.setPrompt(function(msg, defVal, cb){
-          const looksNumeric = numLike(defVal) || /value|값|number|숫자/i.test(String(msg||''));
-          if(looksNumeric){
-            promptCallback = v => { try{ cb(v); }catch(_){} };
-            openForPrompt(defVal, lastAnchor);
-          }else{
-            const ans = window.prompt(String(msg||''), String(defVal||''));
-            try{ cb(ans); }catch(_){}
-          }
-        });
-        Blockly.dialog.__xrobo_v14 = true;
-      }else if(!Blockly.__xrobo_prompt_v14){
-        const old = Blockly.prompt;
-        Blockly.prompt = function(message, defaultValue, callback){
-          const looksNumeric = numLike(defaultValue) || /value|값|number|숫자/i.test(String(message||''));
-          if(looksNumeric){
-            promptCallback = v=>{ try{ callback(v); }catch(_){}}; 
-            openForPrompt(defaultValue, lastAnchor);
-          }else{
-            return old ? old.apply(this, arguments) : window.prompt(message, defaultValue);
-          }
-        };
-        Blockly.__xrobo_prompt_v14 = true;
+        Blockly.FieldNumber.__xrobo_track = true;
       }
     }catch(_){}
   }
 
-  // Blockly/servo 입력 focus 처리
+  /* === focusin 시: 이벤트 블록 vs 숫자 블록 구분 + 숫자패드 표시 === */
   document.addEventListener('focusin', function(e){
     const t = e.target;
     if(!t) return;
 
-    // servoModal / boardStage 숫자 입력 → 항상 숫자패드
-    try{
-      const uaOk = /Android/i.test(navigator.userAgent||'');
-      if(uaOk && t.matches &&
-         t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
-        try{ t.setAttribute('inputmode','none'); t.setAttribute('autocomplete','off'); t.setAttribute('autocorrect','off'); }catch(_){}
-        try{ t.setAttribute('readonly','readonly'); setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0); }catch(_){}
-        openForInput(t, null);
-        const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
-        t.addEventListener('blur', onBlur);
-        return;
-      }
-    }catch(_){}
-
-    // Blockly html 입력인가?
-    const isBlocklyInput =
-      t.classList &&
-      (t.classList.contains('blocklyHtmlInput') ||
-       t.classList.contains('blocklyHtmlTextInput'));
-
-    if(!isBlocklyInput) return;
-
-    // === 이벤트 블록의 PHRASE 필드는 예외: OS 키보드 사용 ===
-    if(currentField &&
-       currentField.sourceBlock_ &&
-       currentField.sourceBlock_.type === 'xrobo_start' &&
-       currentField.name === 'PHRASE'){
-      try{
-        t.removeAttribute('readonly');
-        t.removeAttribute('pattern');
-        t.setAttribute('inputmode','text');
-        t.setAttribute('autocomplete','off');
-        t.setAttribute('autocorrect','off');
-        t.setAttribute('autocapitalize','off');
-        t.setAttribute('spellcheck','false');
-      }catch(_){}
+    if(!(t.classList &&
+         (t.classList.contains('blocklyHtmlInput') ||
+          t.classList.contains('blocklyHtmlTextInput')))){
       return;
     }
 
-    // 그 외 Blockly 입력 → 숫자패드 사용
-    openForInput(t, currentField || null);
+    let isEventPhrase = false;
+    try{
+      const field = currentField;
+      if(field){
+        const block =
+          (field.getSourceBlock && field.getSourceBlock()) ||
+          field.sourceBlock_ ||
+          null;
+        if(block &&
+           block.type === 'xrobo_start' &&
+           field.name === 'PHRASE'){
+          isEventPhrase = true;
+        }
+      }
+    }catch(_){}
+
+    if(isEventPhrase){
+      alert('텍스트 버튼을 눌렀습니다.');
+    }else{
+      alert('숫자 버튼을 눌렀습니다.');
+    }
+
+    // 현재 단계에서는 "입력 방식은 그대로" 유지:
+    // → 모든 블록에 숫자패드 띄움 (기존과 동일하게 동작)
+    openForInput(t);
     const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
     t.addEventListener('blur', onBlur);
   }, true);
 
-  // 클릭 위치 저장 (블록 주변 위치 계산용)
-  (function(){
-    if(!/Android/i.test(navigator.userAgent||'')) { return; }
-    const root = document.getElementById('blocklyDiv') || document.body;
-    const savePt = (e)=>{ lastAnchor = {x:e.clientX, y:e.clientY}; };
-    if(hasPointer) root.addEventListener('pointerdown', savePt, true);
-    else{
-      root.addEventListener('mousedown', savePt, true);
-      root.addEventListener('touchstart', (e)=>{
-        if(e.touches&&e.touches[0]) lastAnchor={x:e.touches[0].clientX, y:e.touches[0].clientY};
-      }, {capture:true, passive:true});
-    }
-  })();
-
-  function tryPatch(){
-    patchFieldNumber();
-    patchFieldTextInput();
-    patchPrompt();
+  function init(){
+    patchFieldTracking();
   }
-
   if(document.readyState==='complete' || document.readyState==='interactive'){
-    tryPatch();
+    init();
   }else{
-    window.addEventListener('DOMContentLoaded', tryPatch);
+    window.addEventListener('DOMContentLoaded', init);
   }
+
+  // 혹시 로딩이 느릴 때 대비 재시도
   let tries=0;
   const iv=setInterval(()=>{
-    tryPatch();
+    init();
     if(++tries>12) clearInterval(iv);
   }, 300);
-
 })();
 </script>
 </body>
