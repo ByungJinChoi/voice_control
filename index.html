@@ -1,0 +1,1907 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>XROBO BLE — Digit OCR Edition</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<script src="https://unpkg.com/blockly/blockly.min.js"></script>
+<!-- Tesseract.js for in-browser OCR (digit-only) -->
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --pad:10px;
+    --uiScale: 1;
+    --headerH: 64px;
+    --btnH: 36px;
+    --gap: 8px;
+    --headerBgTop: #fff7ed;
+    --headerBgBottom: #fffbeb;
+    --headerBorder: #fed7aa;
+    --logH: 180px;
+    --blue: #1d4ed8;
+
+    --handleWBase: 22;
+    --handleHBase: 28;
+    --triWBase:   14;
+    --triHBase:   12;
+
+    --handleW: calc(var(--handleWBase) * var(--uiScale) * 1px);
+    --handleH: calc(var(--handleHBase) * var(--uiScale) * 1px);
+    --triW:    calc(var(--triWBase)    * var(--uiScale) * 1px);
+    --triH:    calc(var(--triHBase)    * var(--uiScale) * 1px);
+    --linkBar: calc(3 * var(--uiScale) * 1px);
+
+    --keyW: clamp(52px, 8vmin, 92px);
+    --keyH: calc(var(--keyW) * 2.7);
+    --keyGap: 6px;
+    --keyFont: 14px;
+
+    /* 기본 눈 변수(코딩 화면에서는 사용 안 함, 오버레이에서만 씀) */
+    --eyesGap: 8vmin;
+    --eyeSize: 42vmin;
+    --pupilSize: 16vmin;
+    --blinkSpeed: 180ms;
+  }
+  @media (max-width: 480px){
+    :root{ --keyGap: 4px; --keyFont: 13px; }
+  }
+
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; }
+  body{ margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#fff; }
+
+  /* ── 헤더 ───────────────────────────────── */
+  header{
+    padding: 8px 12px;
+    background: linear-gradient(180deg, var(--headerBgTop), var(--headerBgBottom));
+    border-bottom: 1px solid var(--headerBorder);
+    position:relative; z-index:10;
+  }
+  #topbar{
+    display:flex; align-items:center; gap: calc(var(--gap) * var(--uiScale));
+    flex-wrap: wrap;
+  }
+  .title{
+    font-weight: 800; letter-spacing: .2px;
+    color:#7c2d12; margin-right: 12px;
+    font-size: calc(18px * var(--uiScale));
+  }
+  .spacer{ flex: 1 1 auto; }
+
+  .btn{
+    height: calc(var(--btnH) * var(--uiScale));
+    padding: 0 calc(12px * var(--uiScale));
+    border:0; border-radius: calc(10px * var(--uiScale));
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size: calc(14px * var(--uiScale)); font-weight:600;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+    background:#f3f4f6; color:#111827; cursor:pointer;
+    user-select:none;
+  }
+  .btn.small{ height: calc(var(--btnH) * var(--uiScale) * .85); padding: 0 calc(10px * var(--uiScale)); font-size: calc(12px * var(--uiScale)); }
+  #connectToggle{ background:#2563eb; color:#fff; }
+  #testBtn{ background:#0ea5e9; color:#fff; }
+  #runToggle{ background:#16a34a; color:#fff; }
+  #fsBtn{ background:#111827; color:#fff; }
+
+  .state{
+    display:inline-flex; align-items:center; gap:calc(6px * var(--uiScale));
+    height: calc(var(--btnH) * var(--uiScale));
+    padding: 0 calc(6px * var(--uiScale));
+    font-size: calc(12px * var(--uiScale));
+  }
+  .badgeDot{
+    width: calc(22px * var(--uiScale));
+    height: calc(22px * var(--uiScale));
+    border-radius: 50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size: calc(11px * var(--uiScale));
+    font-weight:800; color:#fff;
+    box-shadow: 0 0 0 calc(4px * var(--uiScale)) rgba(0,0,0,.06) inset;
+  }
+  .badgeDot.on{ background:#3b82f6; }
+  .badgeDot.off{ background:#ef4444; }
+
+  /* ── 레이아웃 ─────────────────────────── */
+  #main{ display:flex; width:100%; height: calc(100vh - var(--headerH)); }
+  #left{ position:relative; flex:1 1 auto; min-width:0; height:100%; display:flex; overflow:visible; }
+  #blocklyDiv{ flex:1 1 auto; min-width:0; height:100%; width:100%; }
+
+  #right{
+    flex:0 0 40%; display:flex; flex-direction:column; background:#fff;
+    margin:8px 8px 8px 0; border:1px solid #e5e7eb; border-left:3px solid var(--blue);
+    border-radius:12px 0 0 12px; box-shadow:0 2px 10px rgba(0,0,0,.04); overflow:hidden;
+    position:relative;
+  }
+
+  /* ── 우측 상단: 카메라 프리뷰 ── */
+  #rightTop{
+    flex:1 1 auto; border-bottom:1px solid #e5e7eb; min-height: 120px;
+    background:#0b0f14; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    padding: 0; overflow:hidden;
+  }
+  .camWrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; }
+  #camVideo{ width:100%; height:100%; object-fit:cover; transform: scaleX(-1); background:#000; }
+  .camUi{ position:absolute; right:12px; top:12px; display:flex; gap:8px; align-items:center; z-index:2; }
+  .camBadge{ font: 700 12px/1 system-ui; color:#fff; padding:.35rem .6rem; border-radius:999px; border:1px solid rgba(255,255,255,.3); background:rgba(0,0,0,.35); backdrop-filter: blur(6px) }
+
+  /* ROI 초점 박스 */
+  #focusBox{
+    position:absolute; left:50%; top:50%;
+    width:22%; aspect-ratio:1/1;
+    transform: translate(-50%,-50%);
+    border:2px solid rgba(255,255,255,.9);
+    border-radius:10px;
+    box-shadow:0 0 0 2px rgba(0,0,0,.25), 0 0 18px rgba(0,255,220,.35);
+    pointer-events:none; z-index:2; opacity:.15; transition: opacity .2s linear;
+  }
+
+  /* 카메라 숫자 읽기 배지(우측 패널) */
+  #digitReadout{
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:12px; z-index:2; display:inline-flex; align-items:center; gap:.55rem;
+    font: 800 13px/1 system-ui; color:#fff;
+    padding:.48rem .8rem; border-radius:999px; border:1px solid rgba(255,255,255,.35);
+    background:rgba(0,0,0,.35); backdrop-filter: blur(6px);
+  }
+  #digitReadout .value{
+    font: 900 18px/1.1 ui-monospace, Menlo, Consolas, monospace;
+    padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,.12);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.18) inset;
+  }
+
+  /* 리사이저 바 */
+  #rightDivider{ flex:0 0 6px; cursor: row-resize; background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px); }
+
+  /* 로그 패널 */
+  #rightBottom{
+    flex: 0 0 var(--logH);
+    display:flex; flex-direction:column; min-height:0; overflow:hidden;
+    padding: calc(10px * var(--uiScale));
+    background:#0b0f14; color:#d1e4ff; border-top:1px solid #1f2937;
+  }
+  #log{
+    flex:1 1 0; min-height:0; overflow:auto; white-space:pre-wrap;
+    background:#0b0f14; border:1px solid #1f2937; border-radius: calc(8px * var(--uiScale));
+    padding: calc(10px * var(--uiScale));
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
+  }
+
+  /* 실행창 토글 핸들 */
+  #panelHandle{
+    position:absolute; top: calc(12px * var(--uiScale)); right: 0;
+    z-index:999; width: var(--handleW); height: var(--handleH);
+    background: var(--blue); border: 0; border-radius: calc(6px * var(--uiScale));
+    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer; padding: 0;
+  }
+  #panelHandle::before{
+    content:''; position:absolute; top:0; right: calc(0px - var(--linkBar));
+    width: var(--linkBar); height:100%; background: var(--blue);
+    border-top-right-radius: calc(6px * var(--uiScale)); border-bottom-right-radius: calc(6px * var(--uiScale));
+  }
+  #panelHandle::after{
+    content:''; position:absolute; top:50%; transform: translateY(-50%);
+    width:0; height:0; border-style: solid;
+  }
+  #panelHandle.open::after{
+    left: calc((var(--handleW) - var(--triW)) / 2);
+    border-width: var(--triH) 0 var(--triH) var(--triW);
+    border-color: transparent transparent transparent white;
+  }
+  #panelHandle.closed::after{
+    left: calc((var(--handleW) - var(--triW)) / 2);
+    border-width: var(--triH) var(--triW) var(--triH) 0;
+    border-color: transparent white transparent transparent;
+  }
+  .blocklyZoom,.blocklyTrash{ display:block !important; }
+  .blocklyTrashLid, .blocklyTrashcanLid, .blocklyTrashCanLid { display:none !important; }
+
+  body.fs-active #main{ height: calc(100vh - var(--headerH)); }
+  body.panel-collapsed #right{ display:none; }
+  body.panel-collapsed #left{ flex:1 1 100%; }
+
+  /* ── 전체화면 오버레이(눈동자) ───────────────── */
+  #playOverlay{
+    position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:10000;
+    touch-action:none; overscroll-behavior:contain; -webkit-tap-highlight-color:transparent;
+    /* 오버레이 전용: 눈 60% 축소(변수로 직접 덮어쓰기) */
+    --eyesGap: 4.8vmin;            /* 8vmin * 0.6 */
+    --eyeSize: 25.2vmin;           /* 42vmin * 0.6 */
+    --pupilSize: 9.6vmin;          /* 16vmin * 0.6 */
+  }
+  @media (orientation: landscape){
+    #playOverlay{
+      --eyesGap: calc(4.8vmin * 2);          /* 가로에서 간격 2배 */
+      --eyeSize: calc(25.2vmin * 1.5);       /* 가로에서 기본 1.5배 */
+      --pupilSize: calc(9.6vmin * 1.5);
+    }
+  }
+  #playOverlay.show{ display:flex; flex-direction:column; }
+  #playOverlay .body{ flex:1 1 auto; display:flex; align-items:center; justify-content:center; background:#000; }
+
+  /* 눈동자 UI (변수 기반 크기) */
+  #eyesStage{ width:100%; height:100%; display:grid; place-items:center; background:#000; }
+  .eyes{ display:grid; grid-auto-flow:column; align-items:center; gap: var(--eyesGap); }
+  .eye{
+    position:relative; width:var(--eyeSize); height:var(--eyeSize);
+    border-radius: 50%; overflow:hidden;
+    background: radial-gradient(ellipse at 40% 40%, #fff 0 70%, #e9e9e9 100%);
+    box-shadow: 0 1.2vmin 3vmin rgba(0,0,0,.45), inset 0 -0.8vmin 1.6vmin rgba(0,0,0,.12);
+  }
+  .pupil{
+    position:absolute; width:var(--pupilSize); height:var(--pupilSize);
+    border-radius:50%; background: radial-gradient(circle at 40% 35%, #222 0 45%, #000 70%, #000 100%);
+    left:50%; top:50%; transform:translate(-50%,-50%); will-change: transform;
+  }
+  .shine{
+    position:absolute; width: calc(var(--pupilSize)*.35); height: calc(var(--pupilSize)*.35);
+    border-radius:50%; background: rgba(255,255,255,.85); left:25%; top:22%; filter: blur(0.2vmin);
+  }
+  .shine::after{
+    content:""; position:absolute; width:55%; height:55%; left:150%; top:130%;
+    border-radius:50%; background: rgba(255,255,255,.4); filter: blur(0.25vmin);
+  }
+  .eyelid{ position:absolute; inset:0; background:#000; transform-origin:top center; transform:scaleY(0); pointer-events:none; }
+  .blink .eyelid{ animation: blink var(--blinkSpeed) ease-in-out forwards; }
+  @keyframes blink{ 0%{transform:scaleY(0)} 45%{transform:scaleY(1)} 100%{transform:scaleY(0)} }
+
+  /* 전체화면 숫자 배지 */
+  #overlayDigitBadge{
+    position: fixed; left:50%; transform:translateX(-50%);
+    bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 10001;
+    display: none;
+    font: 700 14px/1 system-ui; color:#fff; padding:.5rem .8rem; border-radius: 999px;
+    border:1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); backdrop-filter: blur(6px);
+  }
+  #overlayDigitBadge .value{
+    font: 900 18px/1.1 ui-monospace, Menlo, Consolas, monospace;
+    padding: 2px 8px; border-radius:8px; background: rgba(255,255,255,.12);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.18) inset;
+  }
+
+  /* 전체화면 처리용 전면 카메라(아주 작게, 거울효과, 이벤트 막지 않기) */
+  #eyesCam{
+    position: fixed; left:0; bottom:0; width:12px; height:12px;
+    opacity: .05; pointer-events:none; z-index:0; transform: scaleX(-1);
+  }
+
+
+  /* === 파일 드롭다운 === */
+  .dropdown{ position:relative; }
+  .dropdown .menu{
+    position:absolute; right:0; top:calc(100% + 4px);
+    display:none; min-width:140px;
+    background:#ffffff; border:1px solid #d1d5db; border-radius:8px;
+    box-shadow:0 6px 16px rgba(0,0,0,.12); padding:6px; z-index:1000;
+  }
+  .dropdown .menu.show{ display:block; }
+  .dropdown .menu > button{
+    width:100%; background:transparent; border:0; cursor:pointer;
+    padding:8px 10px; border-radius:6px;
+    font-size:calc(13px * var(--uiScale));
+    text-align:left; color:#111827;
+  }
+  .dropdown .menu > button:hover{ background:#f3f4f6; }
+  #fileBtn{ background:#6b7280; color:#ffffff; }
+</style>
+
+<style id="xrobo-hsplit-style">
+  :root{ --rightW: 40%; } /* initial right width */
+  /* central vertical bar */
+  #hResizer{
+    flex: 0 0 8px;
+    background: linear-gradient(90deg,#e5e7eb,#d1d5db);
+    border-left: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    cursor: col-resize;
+    touch-action: none;
+    margin: 8px 0;
+  }
+  body.hs-resizing, body.hs-resizing *{ cursor: col-resize !important; user-select: none !important; }
+  /* right panel width controlled by CSS var (allow collapse to 0) */
+  #right{ flex: 0 0 var(--rightW) !important; width: var(--rightW) !important; min-width: 0 !important; }
+</style>
+<style id="single-change-hide-handle">
+  /* 기존 열기/닫기 버튼 숨김 */
+  #panelHandle { display: none !important; }
+</style>
+
+<style id="xrobo-kp4x4-v14-style">
+  /* 4x4 키패드 (전화패드 스타일 + 외곽 라인) - 전역 70% 축소 */
+  :root { --xroboKpScale: .7; }
+  #xrobo-kp4x4-v14{
+    position:absolute; left:0; top:0; display:none; z-index:2147483647;
+    background:#000; border:2px solid #000; border-radius:calc(16px * var(--xroboKpScale));
+    padding: calc(12px * var(--xroboKpScale)); box-shadow:0 16px 46px rgba(0,0,0,.45);
+    user-select:none; touch-action:manipulation;
+  }
+  #xrobo-kp4x4-v14.show{ display:block; }
+  #xrobo-kp4x4-v14 .display{
+    margin-bottom:calc(10px * var(--xroboKpScale)); background:#0b0f14; color:#e5e7eb;
+    border:1px solid #1f2937; border-radius:calc(10px * var(--xroboKpScale));
+    padding:calc(10px * var(--xroboKpScale)) calc(12px * var(--xroboKpScale));
+    font-weight:800; font-size:calc(18px * var(--xroboKpScale)); letter-spacing:.6px; min-height:24px;
+  }
+  #xrobo-kp4x4-v14 .grid{
+    display:grid; grid-template-columns: repeat(4, calc(56px * var(--xroboKpScale)));
+    grid-auto-rows: calc(56px * var(--xroboKpScale));
+    gap: calc(10px * var(--xroboKpScale));
+  }
+  #xrobo-kp4x4-v14 button{
+    border:0; border-radius:calc(12px * var(--xroboKpScale)); background:#fff; color:#111;
+    font-weight:900; font-size:calc(20px * var(--xroboKpScale));
+    box-shadow:0 calc(4px * var(--xroboKpScale)) calc(14px * var(--xroboKpScale)) rgba(0,0,0,.22);
+    cursor:pointer;
+  }
+  #xrobo-kp4x4-v14 button:active{ transform:translateY(1px); }
+  #xrobo-kp4x4-v14 .op{ background:#e6eefc; color:#0b3aa6; font-weight:800; }
+  #xrobo-kp4x4-v14 .back{ background:#111827; color:#fff; font-size:calc(18px * var(--xroboKpScale)); }
+  #xrobo-kp4x4-v14 .clear{ background:#e5e7eb; color:#111827; font-size:calc(16px * var(--xroboKpScale)); font-weight:800; }
+  #xrobo-kp4x4-v14 .wide{ grid-column: span 2; height:calc(56px * var(--xroboKpScale)); font-size:calc(18px * var(--xroboKpScale)); font-weight:800; }
+  #xrobo-kp4x4-v14 .ok{ background:#2563eb; color:#fff; }
+  #xrobo-kp4x4-v14 .cancel{ background:#6b7280; color:#fff; }
+</style>
+</head>
+<body>
+  <!-- 헤더 -->
+  <header id="appHeader">
+    <div id="topbar">
+      <div class="title">XROBO BLE — 숫자 인식</div>
+      <div class="spacer"></div>
+      <!-- 파일 드롭다운 -->
+      <div class="dropdown" id="fileDropdown">
+        <button id="fileBtn" class="btn" title="파일">파일 ▾</button>
+        <div id="fileMenu" class="menu" role="menu" aria-hidden="true">
+          <button data-cmd="new" role="menuitem">새로만들기</button>
+          <button data-cmd="save" role="menuitem">저장하기</button>
+          <button data-cmd="load" role="menuitem">불러오기</button>
+        </div>
+      </div>
+
+
+      <span class="state"><span id="statusDot" class="badgeDot off">off</span></span>
+      <button id="connectToggle" class="btn">연결</button>
+
+      <!-- 테스트/실행 -->
+      <button id="testBtn" class="btn" title="코딩 화면에서 테스트 실행">테스트</button>
+      <button id="runToggle" class="btn" title="전체화면 눈동자 실행">실행</button>
+
+      <button id="fsBtn" class="btn" title="전체화면">전체화면</button>
+    </div>
+  </header>
+
+  <!-- 본문 -->
+  <div id="main">
+    <div id="left">
+      <div id="blocklyDiv"></div>
+      <button id="panelHandle" class="open" title="실행창 닫기"></button>
+    </div>
+    <div id="hResizer" class="hsplit" title="좌우 크기 조절 바"></div>
+
+
+    <div id="right">
+      <!-- 우측 상단: 카메라 프리뷰 -->
+      <div id="rightTop">
+        <div class="camWrap" id="camWrap">
+          <video id="camVideo" playsinline autoplay muted></video>
+          <div id="focusBox"></div>
+          <div class="camUi">
+            <span id="camBadge" class="camBadge">Cam: off</span>
+            <button id="camToggle" class="btn small">캠 켜기</button>
+          </div>
+          <!-- 인식 숫자 표시(패널) -->
+          <div id="digitReadout"><span class="label">숫자</span><span class="value">—</span></div>
+        </div>
+      </div>
+      <div id="rightDivider" title="드래그하여 로그 높이 조절"></div>
+      <div id="rightBottom">
+        <div style="font-size:calc(12px * var(--uiScale));color:#9ca3af;">실행 로그</div>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 툴박스 -->
+  <xml id="toolbox" style="display:none">
+    <category name="이벤트" colour="#f59e0b">
+      <block type="xrobo_start"></block>
+    </category>
+    <category name="출력" colour="#60a5fa">
+      <block type="motor12_dd">
+        <field name="M1">20</field><field name="M2">20</field><field name="MS">500</field>
+      </block>
+      <block type="motor12_in">
+        <value name="M1"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
+        <value name="M2"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
+        <value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value>
+      </block>
+      <block type="melody">
+        <field name="PITCH">C4</field>
+        <value name="DUR"><shadow type="math_number"><field name="NUM">200</field></shadow></value>
+        <value name="WAIT"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+      </block>
+      <block type="led_ctrl">
+        <field name="TGT">OUT1</field>
+        <field name="MODE">BRIGHT</field>
+        <field name="VAL">10</field>
+      </block>
+    </category>
+    <category name="제어" colour="#10b981">
+      <block type="controls_repeat_ext">
+        <value name="TIMES"><shadow type="math_number"><field name="NUM">3</field></shadow></value>
+      </block>
+      <block type="wait_seconds">
+        <value name="SEC"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
+      </block>
+    </category>
+  </xml>
+
+  <!-- 전체화면 오버레이: 눈동자 -->
+  <div id="playOverlay" aria-hidden="true">
+    <div class="body">
+      <!-- 처리용 전면 카메라(작게) -->
+      <video id="eyesCam" playsinline muted autoplay></video>
+      <!-- 눈동자 -->
+      <div id="eyesStage" aria-label="귀여운 눈동자">
+        <div class="eyes">
+          <div class="eye"><div class="pupil"><div class="shine"></div></div><div class="eyelid"></div></div>
+          <div class="eye"><div class="pupil"><div class="shine"></div></div><div class="eyelid"></div></div>
+        </div>
+      </div>
+      <!-- 전체화면 숫자 배지 -->
+      <div id="overlayDigitBadge"><span class="label">숫자</span> <span class="value">—</span></div>
+    </div>
+  </div>
+
+<script>
+/* ================= Blockly 기본 설정 ================= */
+class XroboZelosProvider extends Blockly.zelos.ConstantProvider { constructor(){ super(); this.ADD_START_HATS = true; } }
+class XroboZelosRenderer extends Blockly.zelos.Renderer { constructor(){ super('xrobo_zelos'); } makeConstants_(){ return new XroboZelosProvider(); } }
+Blockly.blockRendering.register('xrobo_zelos', XroboZelosRenderer);
+const XroboTheme = Blockly.Theme.defineTheme('xrobo_theme', { base: Blockly.Themes.Zelos, componentStyles: { startHats: true }});
+
+var ws = Blockly.inject('blocklyDiv', {
+  toolbox: document.getElementById('toolbox'),
+  renderer: 'xrobo_zelos',
+  theme: XroboTheme,
+  grid: { spacing:20, length:3, colour:'#eee', snap:true },
+  zoom: { controls:true, wheel:true, startScale:1, minScale:0.5, maxScale:2 },
+  move: { scrollbars:true, drag:true, wheel:true },
+  trashcan: true
+});
+
+/* ▼▼ Blockly v12 변수 API 경고 제거용 SHIM ▼▼ */
+(function patchBlocklyDeprecated(){
+  try{
+    if (Blockly.Workspace && Blockly.Workspace.prototype && Blockly.Workspace.prototype.getAllVariables) {
+      Blockly.Workspace.prototype.getAllVariables = function(){
+        var vm = this.getVariableMap ? this.getVariableMap() : null;
+        return (vm && vm.getAllVariables) ? vm.getAllVariables() : [];
+      };
+    }
+  }catch(e){}
+})();
+/* ▲▲ SHIM 끝 ▲▲ */
+
+/* 드래그 중 자동 스크롤 방지 */
+(function disableAutoScrollWhileBlockDragging(){
+  try{
+    if (Blockly.BlockDragger && Blockly.BlockDragger.prototype) {
+      var orig = Blockly.BlockDragger.prototype.updateDrag;
+      if (typeof orig === 'function') {
+        Blockly.BlockDragger.prototype.updateDrag = function(e){
+          var saved = this.autoScroll_;
+          this.autoScroll_ = null;
+          var r = orig.call(this, e);
+          this.autoScroll_ = saved;
+          return r;
+        };
+      }
+    }
+  }catch(e){ console.warn('AutoScroll patch failed', e); }
+})();
+
+/* ================= 상수/공용 ================= */
+var PINS_OUT=[["OUT1","OUT1"],["OUT2","OUT2"],["OUT3","OUT3"],["OUT4","OUT4"],["OUT5","OUT5"],["OUT6","OUT6"],["OUT7","OUT7"],["OUT8","OUT8"]];
+var SPEEDS=Array.from({length:41},(_,i)=>20-i).map(v=>[String(v),String(v)]);
+var TIMES100=Array.from({length:10},(_,i)=>100*(i+1)).map(v=>[String(v),String(v)]);
+var LED_TGT=[].concat(PINS_OUT,[["CPU","CPU"]]);
+var LED_MODE=[["밝기","BRIGHT"],["숨쉬기","BREATHE"]];
+var LED_VALS=Array.from({length:20},(_,i)=>[String(i),String(i)]);
+
+/* ================= 블록 정의 ================= */
+const DIGIT_OPTIONS = Array.from({length:10}, (_,i)=>[String(i), 'D'+i]);
+Blockly.defineBlocksWithJsonArray([
+  { "type":"xrobo_start", "message0":"숫자 %1 이 보이면",
+    "args0":[{ "type":"field_dropdown","name":"DIGIT","options": DIGIT_OPTIONS }],
+    "nextStatement":null, "colour":36, "hat":"cap"
+  },
+  { "type":"motor12_dd","message0":"모터 M1 %1  M2 %2  시간 %3 ms",
+    "args0":[{"type":"field_dropdown","name":"M1","options":SPEEDS},{"type":"field_dropdown","name":"M2","options":SPEEDS},{"type":"field_dropdown","name":"MS","options":TIMES100}],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210 },
+  { "type":"motor12_in","message0":"모터 M1 %1  M2 %2  시간 %3 ms",
+    "args0":[{"type":"input_value","name":"M1","check":"Number"},{"type":"input_value","name":"M2","check":"Number"},{"type":"input_value","name":"MS","check":"Number"}],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210 },
+  { "type":"melody","message0":"멜로디 음높이 %1 소리시간 %2 ms 대기시간 %3 ms",
+    "args0":[{"type":"field_dropdown","name":"PITCH","options":(function(){var KR=["도","레","미","파","솔","라","시"], EN=["C","D","E","F","G","A","B"], L=[]; for(var o=4;o<=6;o++) for(var i=0;i<7;i++) L.push([KR[i]+o, EN[i]+o]); return L;})()},
+             {"type":"input_value","name":"DUR","check":"Number"},{"type":"input_value","name":"WAIT","check":"Number"}],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":300 },
+  { "type":"led_ctrl","message0":"LED %1 모드 %2 값 %3",
+    "args0":[{"type":"field_dropdown","name":"TGT","options":LED_TGT},{"type":"field_dropdown","name":"MODE","options":LED_MODE},{"type":"field_dropdown","name":"VAL","options":LED_VALS}],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":330 },
+  { "type":"wait_seconds","message0":"%1 초 기다리기",
+    "args0":[{"type":"input_value","name":"SEC","check":"Number"}],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":120 }
+]);
+
+/* ================= 코드 빌더 ================= */
+function numFromInput(parent, name, def){ if (def===void 0) def=0;
+  var raw = Blockly.JavaScript.valueToCode(parent, name, Blockly.JavaScript.ORDER_NONE);
+  var n = Number(raw != null ? raw : ''); return (isFinite(n) ? n : def);
+}
+function walkNode(b, list){
+  if(!b) return;
+  switch(b.type){
+    case 'motor12_dd':{
+      var v1=+b.getFieldValue('M1'),v2=+b.getFieldValue('M2'),ms=+b.getFieldValue('MS');
+      list.push({type:'CMD',s:'M12 '+v1+' '+v2+' '+ms}); if(ms>0) list.push({type:'W',args:[ms]}); break; }
+    case 'motor12_in':{
+      var v1n=numFromInput(b,'M1',0),v2n=numFromInput(b,'M2',0),msn=numFromInput(b,'MS',0);
+      list.push({type:'CMD',s:'M12 '+Math.round(v1n)+' '+Math.round(v2n)+' '+Math.round(msn)}); if(msn>0) list.push({type:'W',args:[msn]}); break; }
+    case 'melody':{
+      var p=b.getFieldValue('PITCH'),dur=numFromInput(b,'DUR',200),wait=numFromInput(b,'WAIT',0);
+      list.push({type:'CMD',s:'MEL '+p+' '+Math.round(dur)+' '+Math.round(wait)}); if(wait>0) list.push({type:'W',args:[wait]}); break; }
+    case 'led_ctrl':{
+      var t=b.getFieldValue('TGT'),m=b.getFieldValue('MODE'),v=+b.getFieldValue('VAL');
+      list.push({type:'CMD',s:'LED '+t+' '+m+' '+v}); break; }
+    case 'controls_repeat_ext':{
+      var times=Math.max(0, numFromInput(b,'TIMES',1));
+      var inner=[]; var first=b.getInputTargetBlock('DO'); walkChain(first, inner);
+      list.push({type:'FOR',count:times,body:inner}); break; }
+    case 'wait_seconds':{
+      var s=numFromInput(b,'SEC',1); if(s>0) list.push({type:'W',args:[s*1000]}); break; }
+  }
+}
+function walkChain(start, list){ for(var n=start; n; n=n.getNextBlock()) walkNode(n, list); }
+function normalizeProgram(list){
+  var out=[]; for(var i=0;i<list.length;i++){
+    var ins=list[i];
+    if(ins.type==='CMD'){ var prev=out[out.length-1]; if(prev && prev.type==='CMD' && prev.s===ins.s) continue; }
+    else if(ins.type==='W'){
+      if(!isFinite(ins.args && ins.args[0]) || ins.args[0]<=0) continue;
+      var prevw=out[out.length-1]; if(prevw && prevw.type==='W'){ prevw.args[0]+=ins.args[0]; continue; }
+    }
+    out.push(ins);
+  }
+  return out;
+}
+function buildEventPrograms(){
+  const programs = { D0:[], D1:[], D2:[], D3:[], D4:[], D5:[], D6:[], D7:[], D8:[], D9:[] };
+  var evs = ws.getBlocksByType('xrobo_start', true);
+  for(var i=0;i<evs.length;i++){
+    var code = evs[i].getFieldValue('DIGIT') || 'D0';
+    var chain = evs[i].getNextBlock(); if(!chain) continue;
+    var prog=[]; walkChain(chain, prog);
+    var norm = normalizeProgram(prog);
+    programs[code] = programs[code].concat(norm);
+  }
+  return programs;
+}
+
+/* ================= 헤더/스케일/풀스크린 ================= */
+function applyHeaderHeight(){
+  var px = document.getElementById('appHeader').offsetHeight || 64;
+  document.documentElement.style.setProperty('--headerH', px+'px');
+  setTimeout(function(){ Blockly.svgResize(ws); }, 60);
+}
+function applyUiScaleFromWorkspace(){
+  var s = Math.max(.7, Math.min(1.6, ws.getScale()));
+  document.documentElement.style.setProperty('--uiScale', s);
+  applyHeaderHeight();
+}
+window.addEventListener('resize', applyHeaderHeight);
+document.addEventListener('fullscreenchange', applyHeaderHeight);
+ws.addChangeListener(function(ev){
+  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){ applyUiScaleFromWorkspace(); }
+});
+setInterval(function(){ applyUiScaleFromWorkspace(); }, 200);
+applyUiScaleFromWorkspace();
+applyHeaderHeight();
+
+/* ================= BLE & 로그 ================= */
+var SERVICE_UUID=0xFFF0;
+var bleDevice=null,bleServer=null,bleService=null,writeChar=null,notifyChar=null;
+var isConnected=false, isRunning=false, isFullscreenRun=false;
+var $=id=>document.getElementById(id);
+var log=function(m){ var L=$('log'); L.textContent+=m+"\n"; L.scrollTop=L.scrollHeight; };
+var dot=$('statusDot');
+var btnConnect=$('connectToggle'), btnRun=$('runToggle'), btnTest=$('testBtn');
+
+var enc = s=> new TextEncoder().encode(s);
+
+function resetBleRefs(){ bleDevice=null; bleServer=null; bleService=null; writeChar=null; notifyChar=null; }
+function setConnected(v){
+  isConnected=v;
+  btnConnect.textContent=v?'해제':'연결';
+  dot.classList.toggle('on',v); dot.classList.toggle('off',!v);
+  dot.textContent=v?'on':'off';
+  if(!v) setRunning(false);
+}
+function setRunning(v){
+  isRunning=v;
+  btnRun.textContent = v ? '■ 정지' : '실행';
+  btnRun.style.background = v ? '#ef4444' : '#16a34a';
+  btnTest.disabled = v;
+}
+
+/* BLE connect/disconnect */
+function connectBLE(){
+  if(!navigator.bluetooth){ alert('이 브라우저는 Web Bluetooth 미지원입니다.'); return; }
+  (async function(){
+    try{
+      var dev = await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:'XROBO' }], optionalServices:[SERVICE_UUID, 0xFFF3, 0xFFF4] });
+      try{ if (bleDevice && bleDevice.removeEventListener){ bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } }catch(e){}
+      resetBleRefs(); bleDevice=dev;
+      if (bleDevice && bleDevice.addEventListener){ bleDevice.addEventListener('gattserverdisconnected', onDisconnected); }
+
+      bleServer=await bleDevice.gatt.connect();
+      bleService=await bleServer.getPrimaryService(SERVICE_UUID);
+
+      try{ writeChar=await bleService.getCharacteristic(0xFFF3);}catch(e){}
+      try{ notifyChar=await bleService.getCharacteristic(0xFFF4);}catch(e){}
+      if(!writeChar || notifyChar==null){
+        var cs=await bleService.getCharacteristics();
+        for(var i=0;i<cs.length;i++){
+          var ch=cs[i], p=ch.properties||{};
+          if(!writeChar && (p.write||p.writeWithoutResponse)) writeChar=ch;
+          if(!notifyChar && p.notify) notifyChar=ch;
+        }
+      }
+      if(!writeChar) throw new Error('write 특성을 찾지 못했습니다.');
+      if(notifyChar){
+        await notifyChar.startNotifications();
+        if (notifyChar.addEventListener){
+          notifyChar.addEventListener('characteristicvaluechanged',function(ev){
+            try{ var v=new TextDecoder().decode(ev.target.value||new Uint8Array()); log('⬅️ '+v.trim()); }catch(e){}
+          });
+        }
+      }
+      setConnected(true);
+      log('✅ 연결: '+(dev.name||'(이름 없음)'));
+    }catch(e){
+      console.error(e); log('❌ 연결 실패: '+e);
+      setConnected(false); resetBleRefs();
+    }
+  })();
+}
+function onDisconnected(){ log('🔌 해제됨'); setConnected(false); resetBleRefs(); }
+function disconnectBLE(){ try{ if (bleDevice && bleDevice.gatt) bleDevice.gatt.disconnect(); }catch(e){} setConnected(false); resetBleRefs(); }
+btnConnect.onclick = ()=> isConnected ? disconnectBLE() : connectBLE();
+
+/* ================= 저장/불러오기 ================= */
+function serializeProject(){
+  var xmlDom = Blockly.Xml.workspaceToDom(ws);
+  var xmlText = Blockly.Xml.domToText(xmlDom);
+  return JSON.stringify({type:'xrobo_project_v1', xml: xmlText}, null, 2);
+}
+function saveProject(){
+  var data = serializeProject();
+  var suggestedName = 'xrobo_project.json';
+  if(window.showSaveFilePicker){
+    (async function(){
+      try{
+        var handle = await showSaveFilePicker({ suggestedName, types:[{description:'XROBO Project', accept:{'application/json':['.json']}}] });
+        var stream = await handle.createWritable();
+        await stream.write(new Blob([data], {type:'application/json'}));
+        await stream.close();
+        log('💾 저장 완료');
+      }catch(e){ if(!(e && e.name==='AbortError')) log('⚠️ 저장 실패: '+e); }
+    })();
+  }else{
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([data], {type:'application/json'}));
+    a.download=suggestedName; a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); }, 1000);
+    log('💾 저장(다운로드) 완료');
+  }
+}
+function loadProject(){
+  (async function(){
+    try{
+      var text='';
+      if(window.showOpenFilePicker){
+        var arr = await showOpenFilePicker({ types:[{description:'XROBO Project', accept:{'application/json':['.json']}}] });
+        var handle = arr[0];
+        var file = await handle.getFile();
+        text = await file.text();
+      }else{
+        var input=document.createElement('input');
+        input.type='file'; input.accept='.json,application/json';
+        var pick = new Promise((res,rej)=>{ input.onchange=()=>{ res(input.files[0]||null); }; input.onerror=rej; });
+        input.click();
+        var file = await pick;
+        if(!file) return;
+        text = await file.text();
+      }
+      var obj = JSON.parse(text);
+      if(!obj || obj.type!=='xrobo_project_v1') throw new Error('알 수 없는 프로젝트 형식');
+      ws.clear();
+      var parser = new DOMParser();
+      var xml = parser.parseFromString(obj.xml, 'text/xml');
+      Blockly.Xml.domToWorkspace(xml.documentElement, ws);
+      log('📂 불러오기 완료');
+    }catch(e){
+      if(!(e && e.name==='AbortError')) alert('불러오기 실패: '+e);
+    }
+  })();
+}
+/* ================= 오른쪽 패널: 리사이저 ================= */
+(function(){
+  var divider = document.getElementById('rightDivider');
+  var root = document.documentElement;
+  var dragging=false, startY=0, startH=0, rightH=0;
+  function pxToNum(px){ return Number(String(px).replace('px',''))||0; }
+  function onDown(e){
+    e.preventDefault();
+    dragging=true;
+    startY=('touches' in e ? e.touches[0].clientY : e.clientY);
+    startH=pxToNum(getComputedStyle(root).getPropertyValue('--logH'));
+    rightH=document.getElementById('right').clientHeight;
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('mouseup', onUp, {once:true});
+    window.addEventListener('touchend', onUp, {once:true});
+  }
+  function onMove(e){
+    if(!dragging) return;
+    var y=('touches' in e ? e.touches[0].clientY : e.clientY);
+    if('touches' in e) e.preventDefault();
+    var delta = startY - y;
+    var nh = startH + delta;
+    var minH=90, maxH=Math.max(130, Math.floor(rightH*0.8));
+    nh=Math.min(maxH, Math.max(minH, nh));
+    root.style.setProperty('--logH', nh+'px');
+  }
+  function onUp(){
+    dragging=false;
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('touchmove', onMove);
+  }
+  divider.addEventListener('mousedown', onDown);
+  divider.addEventListener('touchstart', onDown, {passive:false});
+})();
+
+/* ================= 패널 토글 & 전체화면 버튼 ================= */
+var panelHandle=document.getElementById('panelHandle');
+function syncHandle(){
+  var collapsed = document.body.classList.contains('panel-collapsed');
+  panelHandle.classList.toggle('open',   !collapsed);
+  panelHandle.classList.toggle('closed',  collapsed);
+  panelHandle.title = collapsed ? '실행창 열기' : '실행창 닫기';
+}
+function togglePanel(){ document.body.classList.toggle('panel-collapsed'); syncHandle(); setTimeout(()=>{ Blockly.svgResize(ws); },60); }
+panelHandle.addEventListener('click', togglePanel);
+syncHandle();
+
+var fsBtn=document.getElementById('fsBtn');
+async function enterFS(){ var el=document.documentElement; if(el.requestFullscreen) await el.requestFullscreen(); }
+async function exitFS(){ if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); }
+function syncFSLabel(){
+  var a = !!document.fullscreenElement;
+  document.body.classList.toggle('fs-active', a);
+  fsBtn.textContent = a ? '화면축소' : '전체화면';
+  fsBtn.title = a ? '화면 축소로 전환' : '전체화면으로 전환';
+  applyHeaderHeight();
+}
+fsBtn.onclick=async function(){ if(document.fullscreenElement) await exitFS(); else await enterFS(); };
+document.addEventListener('fullscreenchange', syncFSLabel);
+syncFSLabel();
+
+/* ================= 실행/테스트 & 오버레이 제어 ================= */
+var overlay=document.getElementById('playOverlay');
+var eventPrograms = {};
+var queue = [];
+var queueBusy = false;
+var cancelToken = 0;
+
+function sendRaw(s){
+  if(!writeChar){ log('➡️(BLE 미연결) '+s); return Promise.resolve(); }
+  return writeChar.writeValue(enc(s+'\n')).then(()=>{ log('➡️ '+s); }).catch(e=>{ log('⚠️ 전송 실패: '+e); });
+}
+async function processQueue(localToken){
+  if(queueBusy) return;
+  queueBusy = true;
+  try{
+    while(queue.length && localToken === cancelToken){
+      var item = queue.shift();
+      await runList(item.list, localToken);
+    }
+  }finally{ queueBusy = false; }
+}
+async function runList(list, localToken){
+  for(var i=0;i<list.length;i++){
+    var ins=list[i];
+    if(localToken !== cancelToken) return;
+    if(ins.type==='CMD'){ await sendRaw(ins.s); }
+    else if(ins.type==='W'){ var ms = (ins.args && ins.args[0]) ? ins.args[0] : 0; await new Promise(r=>setTimeout(r, ms)); }
+    else if(ins.type==='FOR'){
+      for(var k=0;k<ins.count;k++){ if(localToken !== cancelToken) return; await runList(ins.body, localToken); }
+    }
+  }
+}
+function triggerEvent(name){
+  if(!isRunning) return;
+  var seq = eventPrograms[name];
+  if(seq && seq.length){
+    queue.push({list: seq});
+    var myToken = cancelToken;
+    processQueue(myToken);
+  }
+}
+
+/* 테스트 실행(코딩 화면) */
+function startTest(){
+  if(isRunning) return;
+  eventPrograms = buildEventPrograms();
+  cancelToken++; queue = [];
+  isFullscreenRun = false;
+  setRunning(true);
+}
+/* 전체화면 눈동자 실행 */
+let overlayStartedCam = false;
+async function startFullRun(){
+  if(isRunning) return;
+  eventPrograms = buildEventPrograms();
+  cancelToken++; queue = [];
+  isFullscreenRun = true;
+  setRunning(true);
+
+  // 오버레이 표시 + 전체화면 시도
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  try{ if(overlay.requestFullscreen) await overlay.requestFullscreen(); }catch(e){}
+
+  // 카메라 자동 시작(없으면)
+  overlayStartedCam = !camOn;
+  if(!camOn){
+    try{ await startCam(); }catch(e){ log('⚠️ 실행 중 카메라 시작 실패: '+e); }
+  }
+  // 오버레이 비디오에 동일 스트림 공유
+  try{
+    const eyesCam = document.getElementById('eyesCam');
+    if(camStream) { eyesCam.srcObject = camStream; await eyesCam.play(); }
+  }catch(e){}
+  startOverlayEyes();
+}
+/* 정지 */
+async function stopRun(){
+  cancelToken++; queue=[];
+  setRunning(false);
+  stopOverlayEyes();                     // 눈동자 루프 정지 및 리스너 해제
+  overlay.classList.remove('show');      // 오버레이 숨김
+  overlay.setAttribute('aria-hidden','true');
+  isFullscreenRun = false;
+  try{ if(document.fullscreenElement) await document.exitFullscreen(); }catch(e){}
+  try{ if(writeChar) writeChar.writeValue(enc('S\n')); }catch(e){}
+  if(overlayStartedCam){ stopCam(); overlayStartedCam=false; }
+}
+
+/* 버튼 바인딩 */
+btnTest.onclick = ()=> { if(!isRunning) startTest(); };
+btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
+
+/* ===== 전체화면에서 백버튼/제스처로 FS 해제될 때 오버레이도 닫기 ===== */
+document.addEventListener('fullscreenchange', ()=>{
+  if (isFullscreenRun && !document.fullscreenElement){
+    stopRun();
+  }
+});
+/* ESC로도 종료(데스크탑) */
+document.addEventListener('keydown', (e)=>{
+  if (isFullscreenRun && e.key === 'Escape') stopRun();
+});
+
+/* ================= 카메라(패널): ROI 내부에서 숫자 인식 + 움직임 초점 ================= */
+const camWrap   = document.getElementById('camWrap');
+const camVideo  = document.getElementById('camVideo');
+const camToggle = document.getElementById('camToggle');
+const camBadge  = document.getElementById('camBadge');
+const focusBox  = document.getElementById('focusBox');
+const digitReadout = document.getElementById('digitReadout');
+const digitValEl = digitReadout.querySelector('.value');
+
+/* 공용 파라미터 (패널/오버레이 동일 사용) */
+const LOW_W = 64, LOW_H = 48;         // 다운샘플 크기 (모션만)
+const MASS_MIN = 12000;               // 모션 총량 임계
+const FOCUS_LERP = 0.20;              // 초점 스무딩
+
+// OCR 파라미터
+const OCR_W = 224, OCR_H = 224;
+const OCR_INTERVAL_MS = 550;          // OCR 주기
+const OCR_HOLD_MS = 280;              // 인식 안정화 시간
+const OCR_MIN_CONF = 62;              // 최소 신뢰도 (0~100)
+const BG_MIN_MEAN = 140;              // ROI 평균 밝기 최소(하얀 종이 조건 힌트)
+
+let camStream = null, camOn = false, camRAF = null;
+
+const procCvs = document.createElement('canvas');
+const procCtx = procCvs.getContext('2d', { willReadFrequently:true });
+procCvs.width = LOW_W; procCvs.height = LOW_H;
+
+// OCR 작업용 캔버스(원본 해상도 ROI를 크게)
+const ocrCvs = document.createElement('canvas');
+const ocrCtx = ocrCvs.getContext('2d', { willReadFrequently:true });
+ocrCvs.width = OCR_W; ocrCvs.height = OCR_H;
+
+/* 모션용 간단 회색 변환 */
+function toGray(r,g,b){ return (r*0.299 + g*0.587 + b*0.114)|0; }
+
+/* 상태 (패널) */
+let activeDigit = null, candDigit = null, candSince = 0;
+let fx=0.5, fy=0.5, fxT=0.5, fyT=0.5;
+
+function setCamBadge(t){ camBadge.textContent = 'Cam: ' + t; }
+function updateCamUi(){
+  setCamBadge(camOn ? 'on' : 'off');
+  camToggle.textContent = camOn ? '캠 끄기' : '캠 켜기';
+}
+function updateDigitReadout(v){
+  digitValEl.textContent = (v==null ? '—' : String(v));
+}
+
+async function startCam(){
+  if(camOn) return;
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:{ideal:'user'}, width:{ideal:320}, height:{ideal:240}, frameRate:{ideal:30,max:30} },
+      audio: false
+    });
+    camStream = stream;
+    camVideo.srcObject = stream;
+    await camVideo.play();
+    camOn = true; updateCamUi();
+    updateDigitReadout(null);
+    await ensureOcr();  // OCR 준비
+    startDetectLoop();
+    log('🎥 카메라 켜짐');
+  }catch(e){
+    log('❌ 카메라 실패: '+e);
+  }
+}
+function stopCam(){
+  if(!camOn) return;
+  try{ camVideo.pause(); }catch(_){}
+  if(camVideo.srcObject){
+    try{ camVideo.srcObject.getTracks().forEach(t=>t.stop()); }catch(_){}
+    camVideo.srcObject = null;
+  }
+  camStream = null; camOn=false; updateCamUi();
+  if(camRAF){ cancelAnimationFrame(camRAF); camRAF=null; }
+  activeDigit=candDigit=null; candSince=0; fx=fy=fxT=fyT=0.5;
+  focusBox.style.left='50%'; focusBox.style.top='50%'; focusBox.style.opacity='.15';
+  updateDigitReadout(null);
+  log('🛑 카메라 꺼짐');
+}
+camToggle.onclick = ()=> camOn ? stopCam() : startCam();
+
+/* ===== Tesseract.js OCR 준비/처리 ===== */
+let ocrWorker = null;
+let ocrReady = false;
+let ocrBusy = false;
+let ocrLastTs = 0;
+
+async function ensureOcr(){
+  if(ocrReady) return;
+  try{
+    ocrWorker = Tesseract.createWorker({ logger: m => { /* console.log(m); */ } });
+    await ocrWorker.load();
+    await ocrWorker.loadLanguage('eng');
+    await ocrWorker.initialize('eng');
+    await ocrWorker.setParameters({
+      tessedit_char_whitelist: '0123456789',
+      tessedit_pageseg_mode: (Tesseract.PSM && Tesseract.PSM.SINGLE_CHAR) ? Tesseract.PSM.SINGLE_CHAR : 10,  // 한 글자 인식
+      user_defined_dpi: '300'
+    });
+    ocrReady = true;
+    log('🧠 OCR 준비 완료');
+  }catch(e){
+    log('❌ OCR 초기화 실패: '+e);
+  }
+}
+
+/* ROI 좌표(원본 비디오 해상도 기준) 계산 */
+function getRoiRectFromFocus(video, fracW=0.22, fracH=0.22){
+  const vw = Math.max(1, video.videoWidth || 320);
+  const vh = Math.max(1, video.videoHeight|| 240);
+  const cx = Math.round((1 - fx) * (vw - 1));  // 좌우 반전 보정
+  const cy = Math.round(     fy  * (vh - 1));
+  const rw = Math.round(vw * fracW);
+  const rh = Math.round(vh * fracH);
+  const x0 = Math.max(0, Math.min(vw - rw, cx - Math.floor(rw/2)));
+  const y0 = Math.max(0, Math.min(vh - rh, cy - Math.floor(rh/2)));
+  return { x:x0, y:y0, w:rw, h:rh, vw, vh };
+}
+
+/* ROI 전처리 (그레이 → 간단 임계화) */
+function preprocessToOcrCanvas(video, rect){
+  ocrCtx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, OCR_W, OCR_H);
+  const img = ocrCtx.getImageData(0,0, OCR_W, OCR_H);
+  const d = img.data;
+  let sum=0;
+  // 1) 그레이
+  for(let i=0; i<d.length; i+=4){
+    const g = toGray(d[i], d[i+1], d[i+2]);
+    d[i]=d[i+1]=d[i+2]=g;
+    sum+=g;
+  }
+  const mean = sum / (OCR_W*OCR_H);
+  // 2) 간이 임계 (밝은 바탕/어두운 글자 가정)
+  const th = Math.max(60, Math.min(220, mean - 12));
+  for(let i=0; i<d.length; i+=4){
+    const v = d[i] < th ? 0 : 255;
+    d[i]=d[i+1]=d[i+2]=v;
+    d[i+3]=255;
+  }
+  ocrCtx.putImageData(img, 0, 0);
+  return { mean };
+}
+
+async function runOcrOnVideo(video){
+  if(!ocrReady || ocrBusy) return null;
+  const now = performance.now();
+  if(now - ocrLastTs < OCR_INTERVAL_MS) return null;
+  ocrLastTs = now;
+  const rect = getRoiRectFromFocus(video);
+  const { mean } = preprocessToOcrCanvas(video, rect);
+  if(mean < BG_MIN_MEAN){
+    // 배경이 너무 어두우면 하얀 종이가 아닐 가능성 → 스킵
+    return null;
+  }
+  try{
+    ocrBusy = true;
+    const res = await ocrWorker.recognize(ocrCvs);
+    let bestDigit = null, bestConf = -1;
+    // 1) symbol 수준에서 가장 자신있는 숫자 고름
+    if(res && res.data && res.data.symbols && res.data.symbols.length){
+      for(const s of res.data.symbols){
+        const ch = (s.text||'').trim();
+        if(/^[0-9]$/.test(ch)){
+          if(s.confidence > bestConf){ bestConf = s.confidence; bestDigit = ch; }
+        }
+      }
+    }
+    // 2) symbol이 비어 있으면 text에서 추출
+    if(!bestDigit && res && res.data && typeof res.data.text === 'string'){
+      const m = res.data.text.match(/[0-9]/);
+      if(m){ bestDigit = m[0]; bestConf = (res.data.confidence||0); }
+    }
+    ocrBusy = false;
+    if(bestDigit != null && bestConf >= OCR_MIN_CONF){
+      return { digit: bestDigit, conf: bestConf|0 };
+    }
+  }catch(e){
+    ocrBusy = false;
+    // 에러는 조용히 무시
+  }
+  return null;
+}
+
+/* 패널 감지 루프 */
+function startDetectLoop(){
+  const step = async ()=>{
+    // 전체화면 실행 중에는 패널의 OCR 트리거만 쉬어 중복 방지(모션은 유지하여 박스 이동)
+    const runOcr = !isFullscreenRun;
+
+    if(!camOn || camVideo.readyState < 2){ camRAF = requestAnimationFrame(step); return; }
+
+    // 1) 저해상도 프레임 → 모션 기반 초점 이동
+    procCtx.drawImage(camVideo, 0, 0, LOW_W, LOW_H);
+    const frame = procCtx.getImageData(0,0,LOW_W,LOW_H);
+    const data = frame.data;
+
+    if (!step.prevGray) step.prevGray = new Uint8ClampedArray(LOW_W*LOW_H);
+    let mass=0, sx=0, sy=0;
+
+    for(let y=0, i=0, p=0; y<LOW_H; y++){
+      for(let x=0; x<LOW_W; x++, i++){
+        const r = data[p++], g = data[p++], b = data[p++]; p++;
+        const gray = toGray(r,g,b);
+        const d = Math.abs(gray - step.prevGray[i]);
+        step.prevGray[i] = gray;
+        if (d>0){ sx += x * d; sy += y * d; mass += d; }
+      }
+    }
+
+    // 초점 업데이트
+    if (mass > MASS_MIN){
+      const cx = sx / mass, cy = sy / mass;
+      fxT = 1 - (cx / (LOW_W-1));  // 좌우 반전
+      fyT =      (cy / (LOW_H-1));
+      focusBox.style.opacity = '1';
+    }else{
+      focusBox.style.opacity = '.15';
+    }
+    fx += (fxT-fx)*FOCUS_LERP; fy += (fyT-fy)*FOCUS_LERP;
+    focusBox.style.left = (fx*100).toFixed(1)+'%';
+    focusBox.style.top  = (fy*100).toFixed(1)+'%';
+
+    // 2) ROI OCR (주기적으로)
+    if(runOcr){
+      const out = await runOcrOnVideo(camVideo);
+      const now = performance.now();
+      let frameDigit = null;
+      if(out && out.digit!=null){
+        frameDigit = String(out.digit);
+      }
+      if (candDigit !== frameDigit){ candDigit = frameDigit; candSince = now; }
+      if ((now - candSince) >= OCR_HOLD_MS && activeDigit !== frameDigit){
+        activeDigit = frameDigit;
+        updateDigitReadout(activeDigit);
+        if (activeDigit!=null){
+          log('🎯 숫자 감지(ROI): '+activeDigit+' (이벤트 실행)');
+          triggerEvent('D'+activeDigit);
+        }else{
+          log('◽ 숫자 없음');
+        }
+      }
+    }
+
+    camRAF = requestAnimationFrame(step);
+  };
+  camRAF = requestAnimationFrame(step);
+}
+
+/* ================= 전체화면 눈동자: ROI에서도 같은 OCR 파이프라인 사용 ================= */
+const overlayEl = document.getElementById('playOverlay');
+const overlayDigitBadge = document.getElementById('overlayDigitBadge');
+const overlayDigitVal = overlayDigitBadge.querySelector('.value');
+const eyesCam = document.getElementById('eyesCam');
+
+const ovEyes = [...document.querySelectorAll('#playOverlay .eye')];
+const ovPupils = [...document.querySelectorAll('#playOverlay .pupil')];
+
+let eyesRAF = null;
+let ovPrevGray = null;
+
+/* 눈꺼풀 깜빡임 */
+let overlayBlinkTimer = null;
+function scheduleOverlayBlink(){
+  clearTimeout(overlayBlinkTimer);
+  const t = 2200 + Math.random()*3300;
+  overlayBlinkTimer = setTimeout(()=>{
+    ovEyes.forEach(e=>{
+      e.classList.add('blink');
+      setTimeout(()=> e.classList.remove('blink'),
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--blinkSpeed')) + 40);
+    });
+    scheduleOverlayBlink();
+  }, t);
+}
+
+/* 동공 렌더 */
+function renderPupils(nx, ny){
+  ovEyes.forEach((eye, i) => {
+    const rect = eye.getBoundingClientRect();
+    const rEye = Math.min(rect.width, rect.height)/2;
+    const limit = rEye * 0.32;
+    let dx = nx * limit, dy = ny * limit;
+    const dist = Math.hypot(dx,dy);
+    if (dist>limit){ const r = limit/dist; dx*=r; dy*=r; }
+    ovPupils[i].style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  });
+}
+
+/* 터치/드래그로 시선 이동 */
+let overlayPointerActive = false, overlayPointerIdleTimer = null;
+function setOverlayTarget(nx,ny){ ovTarget.x = Math.max(-1, Math.min(1,nx)); ovTarget.y = Math.max(-1, Math.min(1,ny)); }
+function handleOverlayPointer(e){
+  const pt = ('touches' in e && e.touches[0]) ? e.touches[0] : e;
+  const cx = innerWidth/2, cy = innerHeight/2;
+  const dx = pt.clientX - cx, dy = pt.clientY - cy;
+  const d = Math.hypot(innerWidth, innerHeight) || 1;
+  setOverlayTarget(dx/(d*0.25), dy/(d*0.25));
+  overlayPointerActive = true;
+  clearTimeout(overlayPointerIdleTimer);
+  overlayPointerIdleTimer = setTimeout(()=> { overlayPointerActive = false; }, 900);
+}
+
+/* 더블 탭/클릭 종료 */
+let lastTap=0;
+function onOverlayPointerDown(e){
+  const now = e.timeStamp || Date.now();
+  if (now - lastTap <= 300){ stopRun(); lastTap = 0; }
+  else lastTap = now;
+}
+function onOverlayDblClick(){ stopRun(); }
+
+/* 숫자 배지 갱신(오버레이) */
+function overlayShowDigit(d){
+  if (d==null){ overlayDigitBadge.style.display='none'; return; }
+  overlayDigitVal.textContent = String(d);
+  overlayDigitBadge.style.display='inline-flex';
+}
+
+/* 오버레이 타겟/현재(시선) */
+let ovCurrent = {x:0, y:0}, ovTarget = {x:0, y:0};
+// 오버레이에서의 숫자 안정화 상태
+let ovActiveDigit = null, ovCandDigit = null, ovCandSince = 0;
+
+/* 오버레이 감지 루프 */
+function startOverlayEyes(){
+  if(eyesRAF) cancelAnimationFrame(eyesRAF);
+  ovPrevGray = null; overlayShowDigit(null);
+  scheduleOverlayBlink();
+
+  // 이벤트 바인딩
+  overlayEl.addEventListener('pointermove', handleOverlayPointer, {passive:true});
+  overlayEl.addEventListener('pointerdown', handleOverlayPointer, {passive:true});
+  overlayEl.addEventListener('pointerdown', onOverlayPointerDown, {passive:true});
+  overlayEl.addEventListener('dblclick', onOverlayDblClick, {passive:true});
+
+  const eProc = document.createElement('canvas');
+  const eCtx  = eProc.getContext('2d', { willReadFrequently:true });
+  eProc.width = LOW_W; eProc.height = LOW_H;
+
+  function loop(){
+    if(!isRunning || !isFullscreenRun){ eyesRAF = requestAnimationFrame(loop); return; }
+    if(!eyesCam || eyesCam.readyState < 2){ eyesRAF = requestAnimationFrame(loop); return; }
+
+    // 1) 모션 기반 시선
+    eCtx.drawImage(eyesCam, 0, 0, LOW_W, LOW_H);
+    const img = eCtx.getImageData(0,0,LOW_W,LOW_H);
+    const data = img.data;
+    if (!ovPrevGray) ovPrevGray = new Uint8ClampedArray(LOW_W*LOW_H);
+    let mass=0, sx=0, sy=0;
+
+    for (let y=0, i=0, p=0; y<LOW_H; y++){
+      for (let x=0; x<LOW_W; x++, i++){
+        const r = data[p++], g = data[p++], b = data[p++]; p++;
+        const gray = toGray(r,g,b);
+        const d = Math.abs(gray - ovPrevGray[i]);
+        ovPrevGray[i] = gray;
+        if (d>0){ sx += x * d; sy += y * d; mass += d; }
+      }
+    }
+
+    // 초점(fx,fy) 업데이트(패널과 동일)
+    if (!startOverlayEyes.fx){ startOverlayEyes.fx=0.5; startOverlayEyes.fy=0.5; startOverlayEyes.fxT=0.5; startOverlayEyes.fyT=0.5; }
+    let {fx,fy,fxT,fyT} = startOverlayEyes;
+
+    if (mass > MASS_MIN){
+      const cx = sx / mass, cy = sy / mass;
+      fxT = 1 - (cx / (LOW_W-1));   // 좌우 반전
+      fyT =      (cy / (LOW_H-1));
+    }
+    // 스무딩
+    fx += (fxT-fx)*FOCUS_LERP; fy += (fyT-fy)*FOCUS_LERP;
+    startOverlayEyes.fx=fx; startOverlayEyes.fy=fy; startOverlayEyes.fxT=fxT; startOverlayEyes.fyT=fyT;
+
+    // 시선: 모션 방향 (터치가 있으면 터치 우선)
+    if (!overlayPointerActive){
+      if (mass > MASS_MIN){
+        let nx = -((sx/mass) - (LOW_W/2)) / (LOW_W/2);
+        let ny =  ((sy/mass) - (LOW_H/2)) / (LOW_H/2);
+        const dead=0.06;
+        nx = Math.abs(nx)<dead ? 0 : nx;
+        ny = Math.abs(ny)<dead ? 0 : ny;
+        ovTarget.x = Math.max(-1, Math.min(1, nx*1.2));
+        ovTarget.y = Math.max(-1, Math.min(1, ny*1.2));
+      }else{
+        ovTarget.x *= 0.985; ovTarget.y *= 0.985;
+      }
+    }
+    // 보간 + 렌더
+    ovCurrent.x = ovCurrent.x + (ovTarget.x - ovCurrent.x)*0.20;
+    ovCurrent.y = ovCurrent.y + (ovTarget.y - ovCurrent.y)*0.20;
+    renderPupils(ovCurrent.x, ovCurrent.y);
+
+    // 2) ROI OCR (전체화면에서는 이 루프에서 실행)
+    (async ()=>{
+      const out = await runOcrOnVideo(eyesCam);
+      const now = performance.now();
+      let frameDigit = null;
+      if(out && out.digit!=null){
+        frameDigit = String(out.digit);
+      }
+      if (ovCandDigit !== frameDigit){ ovCandDigit = frameDigit; ovCandSince = now; }
+      if ((now - ovCandSince) >= OCR_HOLD_MS && ovActiveDigit !== frameDigit){
+        ovActiveDigit = frameDigit;
+        overlayShowDigit(ovActiveDigit);
+        if (ovActiveDigit!=null){
+          triggerEvent('D'+ovActiveDigit);
+        }
+      }
+    })();
+
+    eyesRAF = requestAnimationFrame(loop);
+  }
+  eyesRAF = requestAnimationFrame(loop);
+}
+
+function stopOverlayEyes(){
+  if(eyesRAF){ cancelAnimationFrame(eyesRAF); eyesRAF=null; }
+  ovPrevGray=null; overlayShowDigit(null);
+  clearTimeout(overlayBlinkTimer);
+  overlayEl.removeEventListener('pointermove', handleOverlayPointer);
+  overlayEl.removeEventListener('pointerdown', handleOverlayPointer);
+  overlayEl.removeEventListener('pointerdown', onOverlayPointerDown);
+  overlayEl.removeEventListener('dblclick', onOverlayDblClick);
+}
+
+/* ================= 끝 ================= */
+</script>
+
+<script id="xrobo-hsplit-script">
+(function(){
+  var res = document.getElementById('hResizer');
+  var main = document.getElementById('main');
+  var right = document.getElementById('right');
+  if(!res || !main || !right) return;
+
+  var dragging = false;
+  var startX = 0;
+  var startW = 0;
+  var rafId = 0;
+  var maxW = 0;
+
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+  function computeMax(){
+    var rect = main.getBoundingClientRect();
+    var barW = res.getBoundingClientRect().width || 8;
+    // Allow full-span: left can shrink to 0 (no minimum), so max right width is container minus bar
+    maxW = Math.max(0, rect.width - barW);
+    return maxW;
+  }
+
+  function onDown(clientX){
+    dragging = true;
+    startX = clientX;
+    startW = right.getBoundingClientRect().width;
+    computeMax();
+    document.body.classList.add('hs-resizing');
+  }
+
+  function applyWidth(newW){
+    // Allow collapse to 0 and expand up to container edge (minus bar)
+    newW = clamp(newW, 0, maxW);
+    document.documentElement.style.setProperty('--rightW', newW + 'px');
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(function(){
+      try{ if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) { Blockly.svgResize(ws); } }catch(e){}
+    });
+  }
+
+  function onMove(clientX){
+    if(!dragging) return;
+    var dx = clientX - startX;
+    // Dragging to the RIGHT enlarges LEFT (shrinks right), and vice versa.
+    var newW = startW - dx;
+    applyWidth(newW);
+  }
+
+  function onUp(){
+    dragging = false;
+    document.body.classList.remove('hs-resizing');
+  }
+
+  // Mouse
+  res.addEventListener('mousedown', function(e){ e.preventDefault(); onDown(e.clientX); });
+  window.addEventListener('mousemove', function(e){ onMove(e.clientX); });
+  window.addEventListener('mouseup', onUp);
+
+  // Touch
+  res.addEventListener('touchstart', function(e){
+    if(!e.touches || !e.touches[0]) return;
+    e.preventDefault();
+    onDown(e.touches[0].clientX);
+  }, {passive:false});
+  window.addEventListener('touchmove', function(e){
+    if(!e.touches || !e.touches[0]) return;
+    onMove(e.touches[0].clientX);
+  }, {passive:false});
+  window.addEventListener('touchend', onUp);
+
+  // Ensure panel visible by default (we're using a slider, not the old toggle)
+  document.body.classList.remove('panel-collapsed');
+
+  // Keep within bounds when window resizes
+  window.addEventListener('resize', function(){
+    var cur = right.getBoundingClientRect().width;
+    var mx = computeMax();
+    if(cur > mx) applyWidth(mx);
+  });
+})();
+
+/* === 파일 드롭다운 로직(저장/불러오기) === */
+(function(){
+  var btn  = document.getElementById('fileBtn');
+  var menu = document.getElementById('fileMenu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('show');
+    menu.setAttribute('aria-hidden', menu.classList.contains('show') ? 'false' : 'true');
+  });
+  document.addEventListener('click', function(){
+    menu.classList.remove('show');
+    menu.setAttribute('aria-hidden','true');
+  });
+  menu.addEventListener('click', function(e){
+    var t = e.target;
+    if(!t || !t.getAttribute) return;
+    var cmd = t.getAttribute('data-cmd');
+    if(!cmd) return;
+    try{
+      if(cmd==='save'){ if(typeof saveProject==='function') saveProject(); }
+      else if(cmd==='load'){ if(typeof loadProject==='function') loadProject(); }
+    }catch(_){}
+    menu.classList.remove('show');
+    menu.setAttribute('aria-hidden','true');
+  });
+})();
+</script>
+
+
+<!-- === 새로만들기 전용 안전 바인딩(다른 코드 변경 없이 추가) === -->
+<script>
+(function(){
+  var menu = document.getElementById('fileMenu');
+  if(!menu) return;
+  if(menu.__x_new_bound) return;
+  menu.__x_new_bound = true;
+  menu.addEventListener('click', function(e){
+    try{
+      var cmd = e && e.target && e.target.getAttribute && e.target.getAttribute('data-cmd');
+      if(cmd !== 'new') return;
+      // 우선 워크스페이스가 있으면 정말 '새로 만들기'
+      if (typeof ws !== 'undefined' && ws && typeof ws.clear === 'function'){
+        if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
+          try{ ws.clear(); }catch(_){}
+          try{ if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs && typeof multiServoConfigs.clear==='function') multiServoConfigs.clear(); }catch(_){}
+          try{ if(typeof refreshCodeDebounced === 'function') refreshCodeDebounced(); }catch(_){}
+          try{ if(typeof log === 'function') log('🆕 새 프로젝트'); }catch(_){}
+        }
+      }else{
+        // 워크스페이스가 없으면 페이지 새로고침으로 폴백
+        if(confirm('페이지를 새로고침하여 새로 시작할까요?')){
+          location.reload();
+        }
+      }
+    }catch(_){ /* no-op */ }
+  });
+})();
+</script>
+<script id="xrobo-kp4x4-v14-script">
+(function(){
+  // Only enable keypad on Android; on desktop Chrome, keypad is disabled.
+  if(!/Android/i.test(navigator.userAgent||'')) { return; }
+
+  'use strict';
+  const isAndroid = /Android/i.test(navigator.userAgent||'');
+  if(!isAndroid){ return; }
+  const hasPointer = 'PointerEvent' in window;
+
+  let pad, disp, grid;
+  let activeInput = null;     // html input (if captured)
+  let activeField = null;     // Blockly field instance (FieldNumber)
+  let promptCallback = null;  // prompt override
+  let buffer = '';
+  let rafId = 0;
+  let lastAnchor = {x: window.innerWidth/2, y: 140};
+  let outsideBound = false;
+  let committing = false;
+
+  // press dedup (for some Androids firing twice)
+  let lastPressLabel = '';
+  let lastPressTime = 0;
+  const PRESS_DEBOUNCE_MS = 160;
+
+  /* ===== utils ===== */
+  function safeEval(expr){
+    if(typeof expr!=='string') return NaN;
+    expr = expr.replace(/[^0-9+\-*/\s]/g,'').trim();
+    if(!expr) return NaN;
+    const tokens = expr.match(/(\d+|[+\-*/])/g) || [];
+    if(tokens.length===0) return NaN;
+    const values=[], ops=[]; let expectNum=true, unary=null;
+    function prec(op){ return (op==='*'||op==='/')?2:1; }
+    function apply(){ const op=ops.pop(), b=values.pop(), a=values.pop();
+      values.push(op==='+'?a+b: op==='-'?a-b: op==='*'?a*b: (b===0?0:Math.trunc(a/b))); }
+    for(const tk of tokens){
+      if(/^\d+$/.test(tk)){
+        let v=parseInt(tk,10); if(unary==='-') v=-v; unary=null; values.push(v); expectNum=false;
+      }else{
+        if(expectNum){ if(tk==='+'||tk==='-') unary=tk; }
+        else{ while(ops.length && prec(ops[ops.length-1])>=prec(tk)) apply(); ops.push(tk); expectNum=true; }
+      }
+    }
+    while(ops.length) apply();
+    return values.length? values[0]:NaN;
+  }
+  function dispatch(el, type){ try{ el.dispatchEvent(new Event(type, {bubbles:true})); }catch(_){ } }
+
+  /* ===== keypad UI ===== */
+  function buildPad(){
+    if(pad) return pad;
+    pad = document.createElement('div');
+    pad.id = 'xrobo-kp4x4-v14';
+    pad.innerHTML = '<div class="display" aria-live="polite"></div><div class="grid" role="group" aria-label="숫자패드"></div>';
+    document.body.appendChild(pad);
+    disp = pad.querySelector('.display'); grid = pad.querySelector('.grid');
+
+    const layout = [
+      {t:'1'},{t:'2'},{t:'3'},{t:'←',cls:'back'},
+      {t:'4'},{t:'5'},{t:'6'},{t:'C',cls:'clear'},
+      {t:'7'},{t:'8'},{t:'9'},{t:'+',cls:'op'},
+      {t:'*',cls:'op'},{t:'0'},{t:'/',cls:'op'},{t:'-',cls:'op'},
+      // order: 확인 -> 취소
+      {t:'확인',cls:'wide ok'},{t:'취소',cls:'wide cancel'}
+    ];
+    layout.forEach(k=>{
+      const b=document.createElement('button'); b.type='button'; b.textContent=k.t;
+      if(k.cls) k.cls.split(' ').forEach(c=>b.classList.add(c));
+      grid.appendChild(b);
+    });
+
+    const press = (label)=>{
+      const now = performance.now();
+      if(label === lastPressLabel && (now - lastPressTime) < PRESS_DEBOUNCE_MS){
+        return; // ignore duplicate
+      }
+      lastPressLabel = label; lastPressTime = now;
+
+      if(label==='확인'){ commit(); return; }
+      if(label==='취소'){ cancel(); return; }
+      if(label==='C'){ buffer=''; sync(); return; }
+      if(label==='←'){ buffer = buffer.slice(0, buffer.length-1); sync(); return; }
+      if(/^[0-9+\-*/]$/.test(label)){ buffer += label; sync(); return; }
+    };
+
+    function getButtonFromEvent(e){
+      if(e.type==='touchstart' && e.touches && e.touches[0]){
+        const t=e.touches[0]; const el=document.elementFromPoint(t.clientX, t.clientY);
+        return el && el.closest && el.closest('button');
+      }
+      return e.target && e.target.closest && e.target.closest('button');
+    }
+
+    const onPress = (e)=>{
+      const btn = getButtonFromEvent(e); if(!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      press(btn.textContent);
+    };
+
+    // Single path
+    if(!grid.dataset.bound){
+      if(hasPointer){
+        grid.addEventListener('pointerdown', onPress, true);
+      }else if('ontouchstart' in window){
+        grid.addEventListener('touchstart', onPress, {passive:false, capture:true});
+      }else{
+        grid.addEventListener('mousedown', onPress, true);
+      }
+      // prevent native click duplication
+      grid.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+      grid.dataset.bound = '1';
+    }
+
+    // outside handler (single-binding)
+    const outside = (e)=>{
+      if(!pad.classList.contains('show')) return;
+      if(pad.contains(e.target)) return;
+      if(activeInput && e.target===activeInput) return;
+      commit();
+    };
+    if(!outsideBound){
+      if(hasPointer){
+        document.addEventListener('pointerdown', outside, true);
+      }else if('ontouchstart' in window){
+        document.addEventListener('touchstart', outside, {passive:false, capture:true});
+      }else{
+        document.addEventListener('mousedown', outside, true);
+      }
+      outsideBound = true;
+    }
+
+    return pad;
+  }
+
+  function showPad(){ buildPad().classList.add('show'); }
+  function hidePad(){ if(pad) pad.classList.remove('show'); }
+
+  function positionNearRect(r){
+    const br = pad.getBoundingClientRect();
+    const pw=br.width, ph=br.height;
+    const gap=8, vx=window.scrollX||0, vy=window.scrollY||0;
+    let left=r.right + gap + vx, top=r.top + vy;
+    if(left + pw > vx + innerWidth - 6){ left = r.left + vx - pw - gap; }
+    if(top + ph > vy + innerHeight - 6){ top = Math.max(vy+6, vy + innerHeight - ph - 6); }
+    if(top < vy + 6) top = vy + 6;
+    pad.style.left = left + 'px'; pad.style.top = top + 'px';
+  }
+  function positionNearInput(input){ positionNearRect(input.getBoundingClientRect()); }
+  function positionNearPoint(x,y){ positionNearRect({left:x, right:x, top:y, bottom:y, width:0, height:0}); }
+  function positionNearField(field){
+    try{
+      const root = field && field.getClickTarget_ ? field.getClickTarget_() : (field && field.getSvgRoot && field.getSvgRoot());
+      if(root && root.getBoundingClientRect){
+        positionNearRect(root.getBoundingClientRect());
+        return true;
+      }
+    }catch(_){}
+    return false;
+  }
+
+  function startFollowInput(input){
+    cancelAnimationFrame(rafId);
+    const tick=()=>{ if(activeInput){ positionNearInput(input); rafId=requestAnimationFrame(tick);} };
+    tick();
+  }
+  function stopFollow(){ cancelAnimationFrame(rafId); rafId=0; }
+
+  function sync(){
+    if(disp) disp.textContent = buffer;
+    if(activeInput){
+      activeInput.value = buffer;
+      dispatch(activeInput,'input');
+    }
+  }
+
+  function evaluateAndClamp(raw, inputEl){
+    let num = safeEval(String(raw||'').trim());
+    if(!Number.isFinite(num)) return { ok:false, val:String(raw||'') };
+    const min = Number(inputEl?.getAttribute('min'));
+    const max = Number(inputEl?.getAttribute('max'));
+    if(Number.isFinite(min)) num = Math.max(min, num);
+    if(Number.isFinite(max)) num = Math.min(max, num);
+    return { ok:true, val:String(num) };
+  }
+
+  function commit(){
+    if(committing) return;
+    committing = true;
+    try{
+      if(activeField && !activeInput){
+        const { ok, val } = evaluateAndClamp(buffer, null);
+        try{ activeField.setValue(ok ? val : buffer); }catch(_){}
+        activeField = null;
+      }else if(activeField && activeInput){
+        const { ok, val } = evaluateAndClamp(buffer, activeInput);
+        try{ activeField.setValue(ok ? val : buffer); }catch(_){}
+        activeField = null;
+      }else if(typeof promptCallback === 'function'){
+        const n = safeEval(buffer); const v = Number.isFinite(n) ? String(n) : buffer;
+        try{ promptCallback(v); }catch(_){}
+        promptCallback = null;
+      }else if(activeInput){
+        const { ok, val } = evaluateAndClamp(buffer, activeInput);
+        activeInput.value = val;
+        dispatch(activeInput,'input');
+        dispatch(activeInput,'change');
+      }
+      try{ if(window.Blockly && Blockly.WidgetDiv && typeof Blockly.WidgetDiv.hide==='function'){ Blockly.WidgetDiv.hide(); } }catch(_){}
+      activeInput = null;
+      stopFollow(); hidePad();
+    }finally{
+      committing = false;
+    }
+  }
+
+  function cancel(){
+    activeField = null; promptCallback = null; activeInput = null;
+    stopFollow(); hidePad();
+  }
+
+  /* ===== discover Blockly input robustly ===== */
+  function findBlocklyInput(){
+    try{
+      if(window.Blockly){
+        if(Blockly.FieldTextInput && Blockly.FieldTextInput.htmlInput_){
+          return Blockly.FieldTextInput.htmlInput_;
+        }
+        if(Blockly.WidgetDiv && Blockly.WidgetDiv.DIV){
+          const el = Blockly.WidgetDiv.DIV.querySelector('input,textarea');
+          if(el) return el;
+        }
+      }
+      const q = document.querySelector('.blocklyHtmlInput, .blocklyHtmlTextInput, input.blocklyHtmlInput');
+      if(q) return q;
+    }catch(_){}
+    return null;
+  }
+
+  /* ===== openers ===== */
+  function setupInputPlatform(input){
+    if(isAndroid){
+      input.setAttribute('readonly', 'readonly');
+      input.setAttribute('inputmode','none');
+      input.addEventListener('touchstart', ev=>{ ev.preventDefault(); ev.stopPropagation(); }, {capture:true, passive:false});
+      setTimeout(()=>{ try{ input.blur(); }catch(_){ } }, 0);
+    }else{
+      input.removeAttribute('readonly');
+      input.setAttribute('inputmode','numeric');
+      try{ input.focus(); }catch(_){}
+      input.addEventListener('keydown', function(e){
+        if(e.key==='Enter'){ e.preventDefault(); commit(); }
+        else if(e.key==='Escape'){ e.preventDefault(); cancel(); }
+      }, {once:true, capture:true});
+    }
+    input.setAttribute('pattern','[0-9+\\-*/]*');
+    input.setAttribute('autocomplete','off');
+    input.setAttribute('autocorrect','off');
+    input.setAttribute('autocapitalize','off');
+    input.setAttribute('spellcheck','false');
+  }
+
+  function openForInput(input, field){
+    activeInput = input; activeField = field || null; promptCallback = null;
+    setupInputPlatform(input);
+    buffer = String(input.value||'');
+    showPad();
+    positionNearInput(input);
+    startFollowInput(input);
+    sync();
+  }
+
+  function openForField(field){
+    activeField = field || null; activeInput = null; promptCallback = null;
+    buffer = (field && typeof field.getValue==='function') ? String(field.getValue()||'') : '';
+    showPad();
+    if(!positionNearField(field)){
+      positionNearPoint(lastAnchor.x, lastAnchor.y);
+    }
+    sync();
+  }
+
+  function openForPrompt(defVal, anchor){
+    activeInput = null; activeField = null;
+    buffer = String(defVal||'');
+    showPad(); positionNearPoint(anchor.x, anchor.y); sync();
+  }
+
+  /* ===== hooks ===== */
+  function afterEditorOpened(field){
+    let found = false;
+    const adopt = ()=>{
+      const input = findBlocklyInput();
+      if(input){
+        if(!pad || !pad.classList.contains('show')) showPad();
+        openForInput(input, field);
+        found = true;
+        return true;
+      }
+      return false;
+    };
+    if(adopt()) return;
+    openForField(field);
+    let tries = 0;
+    const iv = setInterval(()=>{
+      if(adopt() || ++tries > 8){ clearInterval(iv); }
+    }, 50);
+  }
+
+  function patchFieldNumber(){
+    try{
+      if(!window.Blockly || !Blockly.FieldNumber || Blockly.FieldNumber.__xrobo_v14) return;
+      function wrap(name){
+        const orig = Blockly.FieldNumber.prototype[name];
+        if(!orig) return false;
+        Blockly.FieldNumber.prototype[name] = function(){
+          const rv = orig.apply(this, arguments);
+          const self = this;
+          setTimeout(()=> afterEditorOpened(self), 0);
+          return rv;
+        };
+        return true;
+      }
+      wrap('showEditor_') || wrap('showEditor');
+      Blockly.FieldNumber.__xrobo_v14 = true;
+    }catch(_){}
+  }
+
+  function patchFieldTextInput(){
+    try{
+      if(!window.Blockly || !Blockly.FieldTextInput || Blockly.FieldTextInput.__xrobo_v14) return;
+      const proto = Blockly.FieldTextInput.prototype;
+      const origShow = proto.showEditor_;
+      proto.showEditor_ = function(opt_e){
+        const rv = origShow ? origShow.apply(this, arguments) : undefined;
+        if((typeof Blockly.FieldNumber!=='undefined') && (this instanceof Blockly.FieldNumber)){
+          const self = this;
+          setTimeout(()=> afterEditorOpened(self), 0);
+        }
+        return rv;
+      };
+      const origPrompt = proto.showPromptEditor_;
+      if(typeof origPrompt === 'function'){
+        proto.showPromptEditor_ = function(){
+          if((typeof Blockly.FieldNumber!=='undefined') && (this instanceof Blockly.FieldNumber)){
+            openForPrompt(this.getValue ? this.getValue() : '', lastAnchor);
+            return;
+          }
+          return origPrompt.apply(this, arguments);
+        };
+      }
+      Blockly.FieldTextInput.__xrobo_v14 = true;
+    }catch(_){}
+  }
+
+  function patchPrompt(){
+    try{
+      if(!window.Blockly) return;
+      const numLike = v => /^[\s]*[+\-]?\d+(?:[\s]*[+\-*/][\s]*[+\-]?\d+)*[\s]*$/.test(String(v||''));
+      if(Blockly.dialog && typeof Blockly.dialog.setPrompt==='function' && !Blockly.dialog.__xrobo_v14){
+        Blockly.dialog.setPrompt(function(msg, defVal, cb){
+          const looksNumeric = numLike(defVal) || /value|값|number|숫자/i.test(String(msg||''));
+          if(looksNumeric){
+            promptCallback = v => { try{ cb(v); }catch(_){} };
+            openForPrompt(defVal, lastAnchor);
+          }else{
+            const ans = window.prompt(String(msg||''), String(defVal||''));
+            try{ cb(ans); }catch(_){}
+          }
+        });
+        Blockly.dialog.__xrobo_v14 = true;
+      }else if(!Blockly.__xrobo_prompt_v14){
+        const old = Blockly.prompt;
+        Blockly.prompt = function(message, defaultValue, callback){
+          const looksNumeric = numLike(defaultValue) || /value|값|number|숫자/i.test(String(message||''));
+          if(looksNumeric){
+            promptCallback = v=>{ try{ callback(v); }catch(_){}};
+            openForPrompt(defaultValue, lastAnchor);
+          }else{
+            return old ? old.apply(this, arguments) : window.prompt(message, defaultValue);
+          }
+        };
+        Blockly.__xrobo_prompt_v14 = true;
+      }
+    }catch(_){}
+  }
+
+  document.addEventListener('focusin', function(e){
+    const t = e.target;
+    if(!t) return;
+    if(t.classList && (t.classList.contains('blocklyHtmlInput') || t.classList.contains('blocklyHtmlTextInput'))){
+      openForInput(t, null);
+      const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
+      t.addEventListener('blur', onBlur);
+    } else {
+      try{
+        const uaOk = /Android/i.test(navigator.userAgent||'');
+        if(uaOk && t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
+          try{ t.setAttribute('inputmode','none'); t.setAttribute('autocomplete','off'); t.setAttribute('autocorrect','off'); }catch(_){}
+          try{ t.setAttribute('readonly','readonly'); setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0); }catch(_){}
+          openForInput(t, null);
+          const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
+          t.addEventListener('blur', onBlur);
+        }
+      }catch(_){}
+    }
+  }, true);
+
+  (function(){
+    if(!/Android/i.test(navigator.userAgent||'')) { return; }
+    const root = document.getElementById('blocklyDiv') || document.body;
+    const savePt = (e)=>{ lastAnchor = {x:e.clientX, y:e.clientY}; };
+    if(hasPointer) root.addEventListener('pointerdown', savePt, true);
+    else{
+      root.addEventListener('mousedown', savePt, true);
+      root.addEventListener('touchstart', (e)=>{ if(e.touches&&e.touches[0]) lastAnchor={x:e.touches[0].clientX, y:e.touches[0].clientY}; }, {capture:true, passive:true});
+    }
+  })();
+
+  function tryPatch(){ patchFieldNumber(); patchFieldTextInput(); patchPrompt(); }
+  if(document.readyState==='complete' || document.readyState==='interactive'){
+    tryPatch();
+  }else{
+    window.addEventListener('DOMContentLoaded', tryPatch);
+  }
+  let tries=0; const iv=setInterval(()=>{ tryPatch(); if(++tries>12) clearInterval(iv); }, 300);
+
+})();
+</script>
+</body>
+</html>
