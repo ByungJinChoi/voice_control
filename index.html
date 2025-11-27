@@ -2,10 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>XROBO BLE — Voice Command</title>
+<title>XROBO BLE — Voice Edition</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-
 <style>
   :root{
     --pad:10px;
@@ -36,7 +35,7 @@
     --keyGap: 6px;
     --keyFont: 14px;
 
-    /* 눈 관련 변수는 이제 사용하지 않지만 그대로 둬도 무방 */
+    /* 눈(전체화면 오버레이) */
     --eyesGap: 8vmin;
     --eyeSize: 42vmin;
     --pupilSize: 16vmin;
@@ -81,6 +80,8 @@
   .btn.small{ height: calc(var(--btnH) * var(--uiScale) * .85); padding: 0 calc(10px * var(--uiScale)); font-size: calc(12px * var(--uiScale)); }
   #connectToggle{ background:#2563eb; color:#fff; }
   #testBtn{ background:#0ea5e9; color:#fff; }
+  #runToggle{ background:#16a34a; color:#fff; }
+  #fsBtn{ background:#111827; color:#fff; }
 
   .state{
     display:inline-flex; align-items:center; gap:calc(6px * var(--uiScale));
@@ -112,62 +113,70 @@
     position:relative;
   }
 
-  /* ── 우측 상단: 음성 인식 패널 ── */
+  /* ── 우측 상단: 음성 패널 ── */
   #rightTop{
     flex:1 1 auto; border-bottom:1px solid #e5e7eb; min-height: 120px;
-    background:#0b0f14; color:#fff;
+    background:#020617; color:#fff;
     display:flex; align-items:center; justify-content:center;
     padding: 0; overflow:hidden;
   }
-  #voicePanel{
+  .voiceWrap{
+    position:relative;
     width:100%; height:100%;
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    gap:12px;
-    padding:16px;
-  }
-  #micBtn{
-    width:72px; height:72px;
-    border-radius:999px; border:0;
     display:flex; align-items:center; justify-content:center;
-    font-size:30px;
-    background:#ef4444; color:#fff;
-    box-shadow:0 8px 20px rgba(0,0,0,.4);
-    cursor:pointer;
-    user-select:none;
+    gap:18px; padding:16px;
+    background: radial-gradient(circle at 0% 0%, #1f2937 0, #020617 52%, #000 100%);
   }
-  #micBtn.listening{
-    background:#22c55e;
-    animation: micPulse 0.9s ease-in-out infinite alternate;
-  }
-  @keyframes micPulse{
-    from{ transform:scale(1); box-shadow:0 8px 20px rgba(0,0,0,.4); }
-    to{ transform:scale(1.06); box-shadow:0 12px 30px rgba(0,0,0,.6); }
-  }
-  #voiceStatus{
-    font-size:13px;
-    color:#9ca3af;
-  }
-  #voiceText{
-    min-height:30px;
-    max-width:90%;
-    font-size:14px;
-    color:#e5e7eb;
-    text-align:center;
-    padding:6px 12px;
-    background:rgba(15,23,42,.9);
+  .voiceBtn{
+    width:80px; height:80px;
     border-radius:999px;
-    border:1px solid rgba(148,163,184,.7);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    border:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px;
+    background:#f97316;
+    color:#fff;
+    cursor:pointer;
+    box-shadow:0 0 0 4px rgba(0,0,0,.5), 0 18px 40px rgba(0,0,0,.7);
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .voiceBtn:active{
+    transform: translateY(1px) scale(.98);
+    box-shadow:0 0 0 3px rgba(0,0,0,.55), 0 10px 26px rgba(0,0,0,.6);
+  }
+  .voiceBtn.listening{
+    animation: pulseMic .9s infinite alternate;
+    background:#fb923c;
+  }
+  @keyframes pulseMic{
+    from{ transform:scale(1); box-shadow:0 0 0 4px rgba(251,146,60,.55), 0 14px 32px rgba(0,0,0,.7); }
+    to{   transform:scale(1.08); box-shadow:0 0 0 8px rgba(251,146,60,.2), 0 20px 46px rgba(0,0,0,.9); }
+  }
+  .voiceInfo{
+    flex:1 1 auto;
+    display:flex; flex-direction:column;
+    gap:6px;
+  }
+  .voiceStatus{
+    font-size:13px;
+    font-weight:700;
+    color:#93c5fd;
+    letter-spacing:.02em;
+  }
+  .voiceText{
+    font-size:14px;
+    font-weight:500;
+    color:#e5e7eb;
+    min-height:2.2em;
+    word-break:break-all;
+  }
+  .voiceHint{
+    margin-top:6px;
+    font-size:11px;
+    color:#6b7280;
   }
 
   /* 리사이저 바 */
-  #rightDivider{
-    flex:0 0 6px; cursor: row-resize;
-    background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px);
-  }
+  #rightDivider{ flex:0 0 6px; cursor: row-resize; background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px); }
 
   /* 로그 패널 */
   #rightBottom{
@@ -184,7 +193,7 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
-  /* 실행창 토글 핸들 (현재는 CSS로 숨김) */
+  /* 실행창 토글 핸들 (지금은 숨김) */
   #panelHandle{
     position:absolute; top: calc(12px * var(--uiScale)); right: 0;
     z-index:999; width: var(--handleW); height: var(--handleH);
@@ -217,6 +226,63 @@
   body.panel-collapsed #right{ display:none; }
   body.panel-collapsed #left{ flex:1 1 100%; }
 
+  /* ── 전체화면 오버레이(눈동자) ───────────────── */
+  #playOverlay{
+    position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:10000;
+    touch-action:none; overscroll-behavior:contain; -webkit-tap-highlight-color:transparent;
+    --eyesGap: 4.8vmin;
+    --eyeSize: 25.2vmin;
+    --pupilSize: 9.6vmin;
+  }
+  @media (orientation: landscape){
+    #playOverlay{
+      --eyesGap: calc(4.8vmin * 2);
+      --eyeSize: calc(25.2vmin * 1.5);
+      --pupilSize: calc(9.6vmin * 1.5);
+    }
+  }
+  #playOverlay.show{ display:flex; flex-direction:column; }
+  #playOverlay .body{ flex:1 1 auto; display:flex; align-items:center; justify-content:center; background:#000; }
+
+  #eyesStage{ width:100%; height:100%; display:grid; place-items:center; background:#000; }
+  .eyes{ display:grid; grid-auto-flow:column; align-items:center; gap: var(--eyesGap); }
+  .eye{
+    position:relative; width:var(--eyeSize); height:var(--eyeSize);
+    border-radius: 50%; overflow:hidden;
+    background: radial-gradient(ellipse at 40% 40%, #fff 0 70%, #e9e9e9 100%);
+    box-shadow: 0 1.2vmin 3vmin rgba(0,0,0,.45), inset 0 -0.8vmin 1.6vmin rgba(0,0,0,.12);
+  }
+  .pupil{
+    position:absolute; width:var(--pupilSize); height:var(--pupilSize);
+    border-radius:50%; background: radial-gradient(circle at 40% 35%, #222 0 45%, #000 70%, #000 100%);
+    left:50%; top:50%; transform:translate(-50%,-50%); will-change: transform;
+  }
+  .shine{
+    position:absolute; width: calc(var(--pupilSize)*.35); height: calc(var(--pupilSize)*.35);
+    border-radius:50%; background: rgba(255,255,255,.85); left:25%; top:22%; filter: blur(0.2vmin);
+  }
+  .shine::after{
+    content:""; position:absolute; width:55%; height:55%; left:150%; top:130%;
+    border-radius:50%; background: rgba(255,255,255,.4); filter: blur(0.25vmin);
+  }
+  .eyelid{ position:absolute; inset:0; background:#000; transform-origin:top center; transform:scaleY(0); pointer-events:none; }
+  .blink .eyelid{ animation: blink var(--blinkSpeed) ease-in-out forwards; }
+  @keyframes blink{ 0%{transform:scaleY(0)} 45%{transform:scaleY(1)} 100%{transform:scaleY(0)} }
+
+  /* 전체화면 음성 배지 */
+  #overlayDigitBadge{
+    position: fixed; left:50%; transform:translateX(-50%);
+    bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 10001;
+    display: none;
+    font: 700 14px/1 system-ui; color:#fff; padding:.5rem .8rem; border-radius: 999px;
+    border:1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); backdrop-filter: blur(6px);
+  }
+  #overlayDigitBadge .value{
+    font: 900 18px/1.1 ui-monospace, Menlo, Consolas, monospace;
+    padding: 2px 8px; border-radius:8px; background: rgba(255,255,255,.12);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.18) inset;
+  }
+
   /* === 파일 드롭다운 === */
   .dropdown{ position:relative; }
   .dropdown .menu{
@@ -238,7 +304,6 @@
 
 <style id="xrobo-hsplit-style">
   :root{ --rightW: 40%; } /* initial right width */
-  /* central vertical bar */
   #hResizer{
     flex: 0 0 8px;
     background: linear-gradient(90deg,#e5e7eb,#d1d5db);
@@ -249,16 +314,13 @@
     margin: 8px 0;
   }
   body.hs-resizing, body.hs-resizing *{ cursor: col-resize !important; user-select: none !important; }
-  /* right panel width controlled by CSS var (allow collapse to 0) */
   #right{ flex: 0 0 var(--rightW) !important; width: var(--rightW) !important; min-width: 0 !important; }
 </style>
 <style id="single-change-hide-handle">
-  /* 기존 열기/닫기 버튼 숨김 */
   #panelHandle { display: none !important; }
 </style>
 
 <style id="xrobo-kp4x4-v14-style">
-  /* 4x4 키패드 (전화패드 스타일 + 외곽 라인) - 전역 70% 축소 */
   :root { --xroboKpScale: .7; }
   #xrobo-kp4x4-v14{
     position:absolute; left:0; top:0; display:none; z-index:2147483647;
@@ -297,8 +359,9 @@
   <!-- 헤더 -->
   <header id="appHeader">
     <div id="topbar">
-      <div class="title">XROBO BLE — 음성 인식</div>
+      <div class="title">XROBO BLE — 음성 명령</div>
       <div class="spacer"></div>
+
       <!-- 파일 드롭다운 -->
       <div class="dropdown" id="fileDropdown">
         <button id="fileBtn" class="btn" title="파일">파일 ▾</button>
@@ -312,8 +375,11 @@
       <span class="state"><span id="statusDot" class="badgeDot off">off</span></span>
       <button id="connectToggle" class="btn">연결</button>
 
-      <!-- 테스트 모드 -->
-      <button id="testBtn" class="btn" title="음성 명령 테스트 모드">테스트</button>
+      <!-- 테스트/실행 -->
+      <button id="testBtn" class="btn" title="코딩 화면에서 테스트 실행">테스트</button>
+      <button id="runToggle" class="btn" title="전체화면 실행">실행</button>
+
+      <button id="fsBtn" class="btn" title="전체화면">전체화면</button>
     </div>
   </header>
 
@@ -326,16 +392,20 @@
     <div id="hResizer" class="hsplit" title="좌우 크기 조절 바"></div>
 
     <div id="right">
-      <!-- 우측 상단: 음성 인식 패널 -->
+      <!-- 우측 상단: 음성 패널 -->
       <div id="rightTop">
-        <div id="voicePanel">
-          <button id="micBtn" class="mic-btn" title="마이크로 음성 인식 시작 (최대 3초)">
+        <div class="voiceWrap" id="voiceWrap">
+          <button id="voiceBtn" class="voiceBtn" title="마이크 시작/정지">
             🎤
           </button>
-          <div id="voiceStatus">대기 중</div>
-          <div id="voiceText"></div>
+          <div class="voiceInfo">
+            <div id="voiceStatus" class="voiceStatus">대기 중</div>
+            <div id="voiceText" class="voiceText">마이크 버튼을 누른 뒤 3초 안에 말해 보세요.</div>
+            <div class="voiceHint">예시: “안녕”이 들리면 → 버저 소리</div>
+          </div>
         </div>
       </div>
+
       <div id="rightDivider" title="드래그하여 로그 높이 조절"></div>
       <div id="rightBottom">
         <div style="font-size:calc(12px * var(--uiScale));color:#9ca3af;">실행 로그</div>
@@ -379,21 +449,27 @@
     </category>
   </xml>
 
+  <!-- 전체화면 오버레이: 눈동자 (카메라 없이 포인터만 따라감) -->
+  <div id="playOverlay" aria-hidden="true">
+    <div class="body">
+      <div id="eyesStage" aria-label="귀여운 눈동자">
+        <div class="eyes">
+          <div class="eye"><div class="pupil"><div class="shine"></div></div><div class="eyelid"></div></div>
+          <div class="eye"><div class="pupil"><div class="shine"></div></div><div class="eyelid"></div></div>
+        </div>
+      </div>
+      <div id="overlayDigitBadge"><span class="label">음성</span> <span class="value">—</span></div>
+    </div>
+  </div>
+
 <script>
 /* ================= Blockly 기본 설정 ================= */
 class XroboZelosProvider extends Blockly.zelos.ConstantProvider {
-  constructor(){
-    super();
-    this.ADD_START_HATS = true;
-  }
+  constructor(){ super(); this.ADD_START_HATS = true; }
 }
 class XroboZelosRenderer extends Blockly.zelos.Renderer {
-  constructor(){
-    super('xrobo_zelos');
-  }
-  makeConstants_(){
-    return new XroboZelosProvider();
-  }
+  constructor(){ super('xrobo_zelos'); }
+  makeConstants_(){ return new XroboZelosProvider(); }
 }
 Blockly.blockRendering.register('xrobo_zelos', XroboZelosRenderer);
 const XroboTheme = Blockly.Theme.defineTheme('xrobo_theme', {
@@ -454,30 +530,67 @@ var LED_VALS=Array.from({length:20},(_,i)=>[String(i),String(i)]);
 Blockly.defineBlocksWithJsonArray([
   {
     "type":"xrobo_start",
-    "message0":"\"%1\" 이(가) 들리면",
+    "message0":"말하기 %1 가 들리면",
     "args0":[
-      { "type":"field_input","name":"TEXT","text":"안녕" }
+      { "type":"field_input","name":"PHRASE","text":"안녕" }
     ],
     "nextStatement":null,
     "colour":36,
     "hat":"cap"
   },
-  { "type":"motor12_dd","message0":"모터 M1 %1  M2 %2  시간 %3 ms",
-    "args0":[{"type":"field_dropdown","name":"M1","options":SPEEDS},{"type":"field_dropdown","name":"M2","options":SPEEDS},{"type":"field_dropdown","name":"MS","options":TIMES100}],
-    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210 },
-  { "type":"motor12_in","message0":"모터 M1 %1  M2 %2  시간 %3 ms",
-    "args0":[{"type":"input_value","name":"M1","check":"Number"},{"type":"input_value","name":"M2","check":"Number"},{"type":"input_value","name":"MS","check":"Number"}],
-    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210 },
-  { "type":"melody","message0":"멜로디 음높이 %1 소리시간 %2 ms 대기시간 %3 ms",
-    "args0":[{"type":"field_dropdown","name":"PITCH","options":(function(){var KR=["도","레","미","파","솔","라","시"], EN=["C","D","E","F","G","A","B"], L=[]; for(var o=4;o<=6;o++) for(var i=0;i<7;i++) L.push([KR[i]+o, EN[i]+o]); return L;})()},
-             {"type":"input_value","name":"DUR","check":"Number"},{"type":"input_value","name":"WAIT","check":"Number"}],
-    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":300 },
-  { "type":"led_ctrl","message0":"LED %1 모드 %2 값 %3",
-    "args0":[{"type":"field_dropdown","name":"TGT","options":LED_TGT},{"type":"field_dropdown","name":"MODE","options":LED_MODE},{"type":"field_dropdown","name":"VAL","options":LED_VALS}],
-    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":330 },
-  { "type":"wait_seconds","message0":"%1 초 기다리기",
+  {
+    "type":"motor12_dd",
+    "message0":"모터 M1 %1  M2 %2  시간 %3 ms",
+    "args0":[
+      {"type":"field_dropdown","name":"M1","options":SPEEDS},
+      {"type":"field_dropdown","name":"M2","options":SPEEDS},
+      {"type":"field_dropdown","name":"MS","options":TIMES100}
+    ],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210
+  },
+  {
+    "type":"motor12_in",
+    "message0":"모터 M1 %1  M2 %2  시간 %3 ms",
+    "args0":[
+      {"type":"input_value","name":"M1","check":"Number"},
+      {"type":"input_value","name":"M2","check":"Number"},
+      {"type":"input_value","name":"MS","check":"Number"}
+    ],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":210
+  },
+  {
+    "type":"melody",
+    "message0":"멜로디 음높이 %1 소리시간 %2 ms 대기시간 %3 ms",
+    "args0":[
+      {
+        "type":"field_dropdown","name":"PITCH",
+        "options":(function(){
+          var KR=["도","레","미","파","솔","라","시"], EN=["C","D","E","F","G","A","B"], L=[];
+          for(var o=4;o<=6;o++) for(var i=0;i<7;i++) L.push([KR[i]+o, EN[i]+o]);
+          return L;
+        })()
+      },
+      {"type":"input_value","name":"DUR","check":"Number"},
+      {"type":"input_value","name":"WAIT","check":"Number"}
+    ],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":300
+  },
+  {
+    "type":"led_ctrl",
+    "message0":"LED %1 모드 %2 값 %3",
+    "args0":[
+      {"type":"field_dropdown","name":"TGT","options":LED_TGT},
+      {"type":"field_dropdown","name":"MODE","options":LED_MODE},
+      {"type":"field_dropdown","name":"VAL","options":LED_VALS}
+    ],
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":330
+  },
+  {
+    "type":"wait_seconds",
+    "message0":"%1 초 기다리기",
     "args0":[{"type":"input_value","name":"SEC","check":"Number"}],
-    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":120 }
+    "previousStatement":null,"nextStatement":null,"inputsInline":true,"colour":120
+  }
 ]);
 
 /* ================= 코드 빌더 ================= */
@@ -497,25 +610,33 @@ function walkNode(b, list){
       break;
     }
     case 'motor12_in':{
-      var v1n=numFromInput(b,'M1',0),v2n=numFromInput(b,'M2',0),msn=numFromInput(b,'MS',0);
+      var v1n=numFromInput(b,'M1',0),
+          v2n=numFromInput(b,'M2',0),
+          msn=numFromInput(b,'MS',0);
       list.push({type:'CMD',s:'M12 '+Math.round(v1n)+' '+Math.round(v2n)+' '+Math.round(msn)});
       if(msn>0) list.push({type:'W',args:[msn]});
       break;
     }
     case 'melody':{
-      var p=b.getFieldValue('PITCH'),dur=numFromInput(b,'DUR',200),wait=numFromInput(b,'WAIT',0);
+      var p=b.getFieldValue('PITCH'),
+          dur=numFromInput(b,'DUR',200),
+          wait=numFromInput(b,'WAIT',0);
       list.push({type:'CMD',s:'MEL '+p+' '+Math.round(dur)+' '+Math.round(wait)});
       if(wait>0) list.push({type:'W',args:[wait]});
       break;
     }
     case 'led_ctrl':{
-      var t=b.getFieldValue('TGT'),m=b.getFieldValue('MODE'),v=+b.getFieldValue('VAL');
+      var t=b.getFieldValue('TGT'),
+          m=b.getFieldValue('MODE'),
+          v=+b.getFieldValue('VAL');
       list.push({type:'CMD',s:'LED '+t+' '+m+' '+v});
       break;
     }
     case 'controls_repeat_ext':{
       var times=Math.max(0, numFromInput(b,'TIMES',1));
-      var inner=[]; var first=b.getInputTargetBlock('DO'); walkChain(first, inner);
+      var inner=[];
+      var first=b.getInputTargetBlock('DO');
+      walkChain(first, inner);
       list.push({type:'FOR',count:times,body:inner});
       break;
     }
@@ -548,31 +669,40 @@ function normalizeProgram(list){
   }
   return out;
 }
-function normalizeKey(s){
-  return String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
-}
-function buildEventPrograms(){
-  const programs = {}; // { normKey: { phrase, list } }
-  var evs = ws.getBlocksByType('xrobo_start', true);
-  for(var i=0;i<evs.length;i++){
-    var raw = evs[i].getFieldValue('TEXT') || '';
-    var key = normalizeKey(raw);
-    if(!key) continue;
-    var chain = evs[i].getNextBlock();
-    if(!chain) continue;
-    var prog=[]; walkChain(chain, prog);
-    var norm = normalizeProgram(prog);
-    if(!norm.length) continue;
-    if(!programs[key]) programs[key] = { phrase: raw.trim(), list: [] };
-    programs[key].list = programs[key].list.concat(norm);
-  }
-  return programs;
+
+/* 트리거 문자열 정규화: 공백/기호 제거 + 소문자 */
+function normalizeTrigger(str){
+  return (str || '')
+    .toLowerCase()
+    .replace(/\s+/g,'')
+    .replace(/[^\p{L}\p{N}]/gu,'')
+    .trim();
 }
 
-/* ================= 헤더/스케일 ================= */
+/* 워크스페이스에서 이벤트 프로그램 빌드 (문장 → 명령 리스트) */
+function buildEventPrograms(){
+  var map = {}; // key -> { label, list }
+  var evs = ws.getBlocksByType('xrobo_start', true);
+  for(var i=0;i<evs.length;i++){
+    var block = evs[i];
+    var raw = block.getFieldValue('PHRASE') || '';
+    var label = raw.trim();
+    var key = normalizeTrigger(label);
+    if(!key) continue;
+    var chain = block.getNextBlock();
+    if(!chain) continue;
+    var prog=[];
+    walkChain(chain, prog);
+    var norm = normalizeProgram(prog);
+    if(!map[key]) map[key] = { label: label || '(빈 문자열)', list: [] };
+    map[key].list = map[key].list.concat(norm);
+  }
+  return map;
+}
+
+/* ================= 헤더/스케일/풀스크린 ================= */
 function applyHeaderHeight(){
-  var header = document.getElementById('appHeader');
-  var px = header ? header.offsetHeight : 64;
+  var px = document.getElementById('appHeader').offsetHeight || 64;
   document.documentElement.style.setProperty('--headerH', px+'px');
   setTimeout(function(){ Blockly.svgResize(ws); }, 60);
 }
@@ -582,89 +712,56 @@ function applyUiScaleFromWorkspace(){
   applyHeaderHeight();
 }
 window.addEventListener('resize', applyHeaderHeight);
+document.addEventListener('fullscreenchange', applyHeaderHeight);
 ws.addChangeListener(function(ev){
-  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){
-    applyUiScaleFromWorkspace();
-  }
+  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){ applyUiScaleFromWorkspace(); }
 });
 setInterval(function(){ applyUiScaleFromWorkspace(); }, 200);
-applyUiScaleFromWorkspace();
 applyHeaderHeight();
 
 /* ================= BLE & 로그 ================= */
 var SERVICE_UUID=0xFFF0;
 var bleDevice=null,bleServer=null,bleService=null,writeChar=null,notifyChar=null;
-var isConnected=false, isRunning=false;
-var eventPrograms = {}; // { normKey: { phrase, list } }
-var queue = [];
-var queueBusy = false;
-var cancelToken = 0;
-
+var isConnected=false, isRunning=false, isFullscreenRun=false;
 var $=id=>document.getElementById(id);
 var log=function(m){
   var L=$('log');
-  if(!L) return;
   L.textContent+=m+"\n";
   L.scrollTop=L.scrollHeight;
 };
 var dot=$('statusDot');
-var btnConnect=$('connectToggle'), btnTest=$('testBtn');
+var btnConnect=$('connectToggle'), btnRun=$('runToggle'), btnTest=$('testBtn');
 
 var enc = s=> new TextEncoder().encode(s);
 
-function resetBleRefs(){
-  bleDevice=null; bleServer=null; bleService=null; writeChar=null; notifyChar=null;
-}
-function stopProgram(){
-  cancelToken++; queue=[];
-  isRunning=false;
-  if(btnTest){
-    btnTest.textContent='테스트';
-    btnTest.style.background='#0ea5e9';
-  }
-}
+function resetBleRefs(){ bleDevice=null; bleServer=null; bleService=null; writeChar=null; notifyChar=null; }
 function setConnected(v){
   isConnected=v;
-  if(btnConnect){
-    btnConnect.textContent=v?'해제':'연결';
-  }
-  if(dot){
-    dot.classList.toggle('on',v);
-    dot.classList.toggle('off',!v);
-    dot.textContent=v?'on':'off';
-  }
-  if(!v) stopProgram();
+  btnConnect.textContent=v?'해제':'연결';
+  dot.classList.toggle('on',v);
+  dot.classList.toggle('off',!v);
+  dot.textContent=v?'on':'off';
+  if(!v) setRunning(false);
 }
-
-function sendRaw(s){
-  if(!writeChar){
-    log('➡️(BLE 미연결) '+s);
-    return Promise.resolve();
-  }
-  return writeChar.writeValue(enc(s+'\n')).then(function(){
-    log('➡️ '+s);
-  }).catch(function(e){
-    log('⚠️ 전송 실패: '+e);
-  });
+function setRunning(v){
+  isRunning=v;
+  btnRun.textContent = v ? '■ 정지' : '실행';
+  btnRun.style.background = v ? '#ef4444' : '#16a34a';
+  btnTest.disabled = v;
 }
 
 /* BLE connect/disconnect */
 function connectBLE(){
-  if(!navigator.bluetooth){
-    alert('이 브라우저는 Web Bluetooth 미지원입니다.');
-    return;
-  }
+  if(!navigator.bluetooth){ alert('이 브라우저는 Web Bluetooth 미지원입니다.'); return; }
   (async function(){
     try{
       var dev = await navigator.bluetooth.requestDevice({
         filters:[{ namePrefix:'XROBO' }],
         optionalServices:[SERVICE_UUID, 0xFFF3, 0xFFF4]
       });
-      try{
-        if (bleDevice && bleDevice.removeEventListener){
-          bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
-        }
-      }catch(e){}
+      try{ if (bleDevice && bleDevice.removeEventListener){
+        bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+      }}catch(e){}
       resetBleRefs();
       bleDevice=dev;
       if (bleDevice && bleDevice.addEventListener){
@@ -712,17 +809,11 @@ function onDisconnected(){
   resetBleRefs();
 }
 function disconnectBLE(){
-  try{
-    if (bleDevice && bleDevice.gatt) bleDevice.gatt.disconnect();
-  }catch(e){}
+  try{ if (bleDevice && bleDevice.gatt) bleDevice.gatt.disconnect(); }catch(e){}
   setConnected(false);
   resetBleRefs();
 }
-if(btnConnect){
-  btnConnect.onclick = function(){
-    isConnected ? disconnectBLE() : connectBLE();
-  };
-}
+btnConnect.onclick = ()=> isConnected ? disconnectBLE() : connectBLE();
 
 /* ================= 저장/불러오기 ================= */
 function serializeProject(){
@@ -751,9 +842,8 @@ function saveProject(){
   }else{
     var a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([data], {type:'application/json'}));
-    a.download=suggestedName;
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    a.download=suggestedName; a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); }, 1000);
     log('💾 저장(다운로드) 완료');
   }
 }
@@ -770,12 +860,9 @@ function loadProject(){
         text = await file.text();
       }else{
         var input=document.createElement('input');
-        input.type='file';
-        input.accept='.json,application/json';
-        var pick = new Promise(function(res,rej){
-          input.onchange=function(){
-            res(input.files[0]||null);
-          };
+        input.type='file'; input.accept='.json,application/json';
+        var pick = new Promise((res,rej)=>{
+          input.onchange=()=>{ res(input.files[0]||null); };
           input.onerror=rej;
         });
         input.click();
@@ -796,11 +883,10 @@ function loadProject(){
   })();
 }
 
-/* ================= 오른쪽 패널: 로그 높이 리사이저 ================= */
+/* ================= 오른쪽 패널: 로그 리사이저 ================= */
 (function(){
   var divider = document.getElementById('rightDivider');
   var root = document.documentElement;
-  if(!divider) return;
   var dragging=false, startY=0, startH=0, rightH=0;
   function pxToNum(px){ return Number(String(px).replace('px',''))||0; }
   function onDown(e){
@@ -833,10 +919,9 @@ function loadProject(){
   divider.addEventListener('touchstart', onDown, {passive:false});
 })();
 
-/* ================= 오른쪽 패널 열기/닫기 핸들 (필요하면 사용) ================= */
+/* ================= 패널 토글 & 전체화면 버튼 ================= */
 var panelHandle=document.getElementById('panelHandle');
 function syncHandle(){
-  if(!panelHandle) return;
   var collapsed = document.body.classList.contains('panel-collapsed');
   panelHandle.classList.toggle('open',   !collapsed);
   panelHandle.classList.toggle('closed',  collapsed);
@@ -845,14 +930,47 @@ function syncHandle(){
 function togglePanel(){
   document.body.classList.toggle('panel-collapsed');
   syncHandle();
-  setTimeout(function(){ Blockly.svgResize(ws); },60);
+  setTimeout(()=>{ Blockly.svgResize(ws); },60);
 }
-if(panelHandle){
-  panelHandle.addEventListener('click', togglePanel);
-}
+panelHandle.addEventListener('click', togglePanel);
 syncHandle();
 
-/* ================= 실행 큐 & 테스트 모드 ================= */
+var fsBtn=document.getElementById('fsBtn');
+async function enterFS(){
+  var el=document.documentElement;
+  if(el.requestFullscreen) await el.requestFullscreen();
+}
+async function exitFS(){
+  if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+}
+function syncFSLabel(){
+  var a = !!document.fullscreenElement;
+  document.body.classList.toggle('fs-active', a);
+  fsBtn.textContent = a ? '화면축소' : '전체화면';
+  fsBtn.title = a ? '화면 축소로 전환' : '전체화면으로 전환';
+  applyHeaderHeight();
+}
+fsBtn.onclick=async function(){
+  if(document.fullscreenElement) await exitFS(); else await enterFS();
+};
+document.addEventListener('fullscreenchange', syncFSLabel);
+syncFSLabel();
+
+/* ================= 실행/큐 & 이벤트 매핑 ================= */
+var eventPrograms = {}; // key -> { label, list }
+var queue = [];
+var queueBusy = false;
+var cancelToken = 0;
+
+function sendRaw(s){
+  if(!writeChar){
+    log('➡️(BLE 미연결) '+s);
+    return Promise.resolve();
+  }
+  return writeChar.writeValue(enc(s+'\n'))
+    .then(()=>{ log('➡️ '+s); })
+    .catch(e=>{ log('⚠️ 전송 실패: '+e); });
+}
 async function runList(list, localToken){
   for(var i=0;i<list.length;i++){
     var ins=list[i];
@@ -861,7 +979,7 @@ async function runList(list, localToken){
       await sendRaw(ins.s);
     }else if(ins.type==='W'){
       var ms = (ins.args && ins.args[0]) ? ins.args[0] : 0;
-      if(ms>0) await new Promise(function(r){ setTimeout(r, ms); });
+      if(ms>0) await new Promise(r=>setTimeout(r, ms));
     }else if(ins.type==='FOR'){
       for(var k=0;k<ins.count;k++){
         if(localToken !== cancelToken) return;
@@ -883,150 +1001,309 @@ async function processQueue(localToken){
   }
 }
 
-function runProgramForKey(text){
-  var key = normalizeKey(text);
+/* 음성 인식으로 트리거된 이벤트 실행 */
+function triggerEvent(key){
+  if(!isRunning) return;
   var entry = eventPrograms[key];
-  if(!entry || !entry.list || !entry.list.length){
-    log('🔎 "'+text+'" 에 해당하는 이벤트 블록이 없습니다.');
-    return;
-  }
+  if(!entry || !entry.list || !entry.list.length) return;
   queue.push({list: entry.list});
-  log('✅ 이벤트 실행: "'+ (entry.phrase || text) +'"');
+  log('▶ 이벤트 실행: "'+ (entry.label || key) + '"');
   var myToken = cancelToken;
   processQueue(myToken);
 }
 
-/* 테스트 모드 시작/정지 */
-function startProgram(){
+/* 테스트 실행 (코딩 화면) */
+function startTest(){
+  if(isRunning) return;
   eventPrograms = buildEventPrograms();
-  cancelToken++;
-  queue=[];
-  isRunning = true;
-  if(btnTest){
-    btnTest.textContent='테스트 정지';
-    btnTest.style.background='#f97316';
+  cancelToken++; queue = [];
+  isFullscreenRun = false;
+  setRunning(true);
+  log('▶ 테스트 실행 준비 완료 (음성 명령 대기)');
+}
+
+/* 전체화면 실행 (눈동자 + 음성) */
+var overlay = document.getElementById('playOverlay');
+async function startFullRun(){
+  if(isRunning) return;
+  eventPrograms = buildEventPrograms();
+  cancelToken++; queue = [];
+  isFullscreenRun = true;
+  setRunning(true);
+
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  try{
+    if(overlay.requestFullscreen) await overlay.requestFullscreen();
+  }catch(e){}
+  startOverlayEyes();
+  log('▶ 전체화면 실행 시작 (음성 명령 대기)');
+}
+
+/* 정지 */
+async function stopRun(){
+  cancelToken++; queue=[];
+  setRunning(false);
+  stopOverlayEyes();
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  isFullscreenRun = false;
+  try{
+    if(document.fullscreenElement) await document.exitFullscreen();
+  }catch(e){}
+  try{
+    if(writeChar) writeChar.writeValue(enc('S\n'));
+  }catch(e){}
+}
+
+/* 버튼 바인딩 */
+btnTest.onclick = ()=> { if(!isRunning) startTest(); };
+btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
+
+/* 전체화면 해제 시 실행 중이면 정지 처리 */
+document.addEventListener('fullscreenchange', ()=>{
+  if (isFullscreenRun && !document.fullscreenElement){
+    stopRun();
   }
-  log('▶️ 테스트 모드 시작 (음성 명령 대기)');
-}
-if(btnTest){
-  btnTest.onclick = function(){
-    if(isRunning){
-      stopProgram();
-      log('⏹ 테스트 모드 정지');
-    }else{
-      startProgram();
-    }
-  };
-}
+});
+document.addEventListener('keydown', (e)=>{
+  if (isFullscreenRun && e.key === 'Escape') stopRun();
+});
 
 /* ================= 음성 인식 (Web Speech API) ================= */
-/*
-  ⚠️ 주의: Web Speech API는 브라우저 내장 엔진을 사용합니다.
-  일부 브라우저에서는 음성을 서버로 전송하여 인식할 수 있습니다.
-  이 코드는 별도의 사용자 서버/데이터는 사용하지 않습니다.
-*/
-var micBtn = $('micBtn');
-var voiceStatus = $('voiceStatus');
-var voiceText = $('voiceText');
+var voiceBtn = document.getElementById('voiceBtn');
+var voiceStatus = document.getElementById('voiceStatus');
+var voiceText = document.getElementById('voiceText');
 
-var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 var recognition = null;
 var recognizing = false;
 var listenTimer = null;
-var lastFinalTranscript = '';
+var lastTranscript = '';
 
-function updateVoiceStatus(text){
-  if(voiceStatus) voiceStatus.textContent = text;
-}
-function updateVoiceText(text){
-  if(voiceText) voiceText.textContent = text || '';
+function updateVoiceUI(state, msg){
+  if(state === 'idle'){
+    voiceStatus.textContent = '대기 중';
+  }else if(state === 'listening'){
+    voiceStatus.textContent = '듣는 중... (최대 3초)';
+  }else if(state === 'thinking'){
+    voiceStatus.textContent = '인식 중...';
+  }else if(state === 'done'){
+    voiceStatus.textContent = '인식 완료';
+  }else if(state === 'error'){
+    voiceStatus.textContent = '오류';
+  }
+  if(typeof msg === 'string') voiceText.textContent = msg;
 }
 
-function initSpeech(){
-  if(recognition || !SpeechRecognition) return;
-  recognition = new SpeechRecognition();
-  try{
+function ensureSpeechRecognition(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    alert('이 브라우저는 음성 인식을 지원하지 않습니다.\n(Chrome / Edge 기반 브라우저를 사용해 주세요)');
+    return null;
+  }
+  if(!recognition){
+    recognition = new SR();
     recognition.lang = 'ko-KR';
-  }catch(e){}
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 3;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
 
-  recognition.onstart = function(){
-    recognizing = true;
-    lastFinalTranscript = '';
-    updateVoiceStatus('듣는 중... (최대 3초)');
-    updateVoiceText('');
-    if(micBtn) micBtn.classList.add('listening');
-  };
-  recognition.onresult = function(event){
-    var finalText = '';
-    var interimText = '';
-    for(var i=0; i<event.results.length; i++){
-      var res = event.results[i];
-      if(res.isFinal){
-        finalText += res[0].transcript;
-      }else{
-        interimText += res[0].transcript;
-      }
-    }
-    if(finalText){
-      lastFinalTranscript = finalText.trim();
-      updateVoiceText(lastFinalTranscript);
-    }else if(interimText){
-      updateVoiceText(interimText.trim());
-    }
-  };
-  recognition.onerror = function(e){
-    log('🎙 음성 인식 오류: '+ (e.error || e.message || e));
-    updateVoiceStatus('오류: 다시 시도해주세요');
-  };
-  recognition.onend = function(){
-    recognizing = false;
-    if(micBtn) micBtn.classList.remove('listening');
-    if(listenTimer){
+    recognition.onstart = function(){
+      recognizing = true;
+      voiceBtn.classList.add('listening');
+      updateVoiceUI('listening', '지금 말해 주세요...');
+    };
+    recognition.onerror = function(e){
+      recognizing = false;
+      voiceBtn.classList.remove('listening');
       clearTimeout(listenTimer);
-      listenTimer=null;
-    }
-    if(!lastFinalTranscript){
-      updateVoiceStatus('인식 실패: 다시 눌러주세요');
-      return;
-    }
-    updateVoiceStatus('인식 완료');
-    log('🎙 인식 결과: "'+ lastFinalTranscript +'"');
-    if(!isRunning){
-      log('ℹ️ 이벤트 실행을 위해 [테스트] 버튼을 먼저 눌러주세요.');
-      return;
-    }
-    runProgramForKey(lastFinalTranscript);
-  };
+      log('❌ 음성 인식 오류: '+ (e && e.error ? e.error : e));
+      updateVoiceUI('error', '음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
+    };
+    recognition.onresult = function(event){
+      var interim='';
+      var finalText='';
+      for(var i=0;i<event.results.length;i++){
+        var res = event.results[i];
+        if(res.isFinal) finalText += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      var display = finalText || interim;
+      if(display){
+        updateVoiceUI('listening', display);
+        lastTranscript = display;
+      }
+    };
+    recognition.onend = function(){
+      recognizing = false;
+      voiceBtn.classList.remove('listening');
+      clearTimeout(listenTimer);
+      if(lastTranscript){
+        updateVoiceUI('done', lastTranscript);
+        handleVoiceCommand(lastTranscript);
+      }else{
+        updateVoiceUI('idle', '인식된 문장이 없습니다. 다시 시도해 주세요.');
+      }
+    };
+  }
+  return recognition;
 }
 
-if(micBtn){
-  micBtn.addEventListener('click', function(){
-    if(!SpeechRecognition){
-      alert('이 브라우저는 음성 인식을 지원하지 않습니다.\nChrome 또는 Edge 최신 버전을 사용해주세요.');
-      return;
+function startVoiceRecognition(){
+  var rec = ensureSpeechRecognition();
+  if(!rec) return;
+  if(recognizing){
+    try{ rec.stop(); }catch(e){}
+    return;
+  }
+  lastTranscript = '';
+  try{
+    rec.start();
+    updateVoiceUI('listening', '지금 말해 주세요...');
+    listenTimer = setTimeout(function(){
+      try{ rec.stop(); }catch(e){}
+    }, 3000);
+  }catch(e){
+    log('⚠️ 음성 인식 시작 실패: '+e);
+    updateVoiceUI('error', '음성 인식을 시작할 수 없습니다.');
+  }
+}
+voiceBtn.addEventListener('click', startVoiceRecognition);
+
+/* 음성 결과 → 이벤트 매칭 */
+function handleVoiceCommand(text){
+  var key = normalizeTrigger(text);
+  if(!key){
+    log('🎙 인식 결과가 비어 있습니다.');
+    return;
+  }
+  log('🎙 인식 문장: "'+ text + '"');
+
+  // 실행 준비가 안 되어 있으면 안내만
+  if(!isRunning){
+    log('ℹ️ 아직 실행 모드가 아닙니다. [테스트] 또는 [실행] 버튼을 먼저 눌러 주세요.');
+    return;
+  }
+
+  var hits = [];
+  for(var k in eventPrograms){
+    if(!Object.prototype.hasOwnProperty.call(eventPrograms,k)) continue;
+    if(!k) continue;
+    // 완전 일치 또는 포함 관계면 매칭
+    if(key === k || key.indexOf(k) >= 0 || k.indexOf(key) >= 0){
+      hits.push(k);
     }
-    initSpeech();
-    if(!recognition) return;
-    if(recognizing){
-      // 다시 누르면 조기 종료
-      recognition.stop();
-      return;
+  }
+  if(!hits.length){
+    log('❔ "'+ text + '" 에 해당하는 이벤트 블록을 찾지 못했습니다.');
+    showOverlayPhrase(text, false);
+    return;
+  }
+  showOverlayPhrase(text, true);
+  hits.forEach(triggerEvent);
+}
+
+/* ================= 전체화면 눈동자 (카메라 없이 포인터 기준) ================= */
+var ovEyes = [].slice.call(document.querySelectorAll('#playOverlay .eye'));
+var ovPupils = [].slice.call(document.querySelectorAll('#playOverlay .pupil'));
+var overlayBadge = document.getElementById('overlayDigitBadge');
+var overlayBadgeValue = overlayBadge.querySelector('.value');
+
+var overlayBlinkTimer = null;
+var eyesRAF = null;
+var ovCurrent = {x:0, y:0};
+var ovTarget = {x:0, y:0};
+var lastTapTime = 0;
+
+function renderPupils(nx, ny){
+  ovEyes.forEach(function(eye, idx){
+    var rect = eye.getBoundingClientRect();
+    var rEye = Math.min(rect.width, rect.height)/2;
+    var limit = rEye * 0.32;
+    var dx = nx * limit;
+    var dy = ny * limit;
+    var dist = Math.hypot(dx,dy);
+    if(dist>limit){
+      var r = limit/dist;
+      dx*=r; dy*=r;
     }
-    updateVoiceStatus('준비 중...');
-    updateVoiceText('');
-    try{
-      recognition.start();
-      listenTimer = setTimeout(function(){
-        if(recognizing && recognition){
-          recognition.stop();
-        }
-      }, 3000);
-    }catch(e){
-      log('🎙 음성 인식 시작 실패: '+e);
-    }
+    ovPupils[idx].style.transform =
+      'translate(calc(-50% + '+dx+'px), calc(-50% + '+dy+'px))';
   });
+}
+
+function scheduleOverlayBlink(){
+  clearTimeout(overlayBlinkTimer);
+  var t = 2200 + Math.random()*3300;
+  overlayBlinkTimer = setTimeout(function(){
+    ovEyes.forEach(function(e){
+      e.classList.add('blink');
+      setTimeout(function(){ e.classList.remove('blink'); },
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--blinkSpeed')) + 40
+      );
+    });
+    scheduleOverlayBlink();
+  }, t);
+}
+
+function handleOverlayPointer(e){
+  var pt = ('touches' in e && e.touches[0]) ? e.touches[0] : e;
+  var cx = window.innerWidth/2;
+  var cy = window.innerHeight/2;
+  var dx = pt.clientX - cx;
+  var dy = pt.clientY - cy;
+  var d = Math.hypot(window.innerWidth, window.innerHeight) || 1;
+  ovTarget.x = Math.max(-1, Math.min(1, dx/(d*0.25)));
+  ovTarget.y = Math.max(-1, Math.min(1, dy/(d*0.25)));
+}
+
+function onOverlayPointerDown(e){
+  handleOverlayPointer(e);
+  var now = e.timeStamp || Date.now();
+  if(now - lastTapTime <= 300){
+    stopRun();
+    lastTapTime = 0;
+  }else{
+    lastTapTime = now;
+  }
+}
+function onOverlayDblClick(){
+  stopRun();
+}
+
+function startOverlayEyes(){
+  if(eyesRAF) cancelAnimationFrame(eyesRAF);
+  scheduleOverlayBlink();
+
+  overlay.addEventListener('pointermove', handleOverlayPointer, {passive:true});
+  overlay.addEventListener('pointerdown', onOverlayPointerDown, {passive:true});
+  overlay.addEventListener('dblclick', onOverlayDblClick, {passive:true});
+
+  function loop(){
+    if(!isRunning || !isFullscreenRun){
+      eyesRAF = requestAnimationFrame(loop);
+      return;
+    }
+    ovCurrent.x = ovCurrent.x + (ovTarget.x - ovCurrent.x)*0.20;
+    ovCurrent.y = ovCurrent.y + (ovTarget.y - ovCurrent.y)*0.20;
+    renderPupils(ovCurrent.x, ovCurrent.y);
+    eyesRAF = requestAnimationFrame(loop);
+  }
+  eyesRAF = requestAnimationFrame(loop);
+}
+function stopOverlayEyes(){
+  if(eyesRAF){ cancelAnimationFrame(eyesRAF); eyesRAF=null; }
+  clearTimeout(overlayBlinkTimer);
+  overlay.removeEventListener('pointermove', handleOverlayPointer);
+  overlay.removeEventListener('pointerdown', onOverlayPointerDown);
+  overlay.removeEventListener('dblclick', onOverlayDblClick);
+  overlayBadge.style.display='none';
+}
+
+/* 전체화면 배지에 마지막 음성 표시 */
+function showOverlayPhrase(text, matched){
+  if(!isFullscreenRun) return;
+  overlayBadgeValue.textContent = text;
+  overlayBadge.style.display='inline-flex';
 }
 
 /* ================= 끝 ================= */
@@ -1050,7 +1327,6 @@ if(micBtn){
   function computeMax(){
     var rect = main.getBoundingClientRect();
     var barW = res.getBoundingClientRect().width || 8;
-    // Allow full-span: left can shrink to 0 (no minimum), so max right width is container minus bar
     maxW = Math.max(0, rect.width - barW);
     return maxW;
   }
@@ -1064,19 +1340,21 @@ if(micBtn){
   }
 
   function applyWidth(newW){
-    // Allow collapse to 0 and expand up to container edge (minus bar)
     newW = clamp(newW, 0, maxW);
     document.documentElement.style.setProperty('--rightW', newW + 'px');
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(function(){
-      try{ if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) { Blockly.svgResize(ws); } }catch(e){}
+      try{
+        if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) {
+          Blockly.svgResize(ws);
+        }
+      }catch(e){}
     });
   }
 
   function onMove(clientX){
     if(!dragging) return;
     var dx = clientX - startX;
-    // Dragging to the RIGHT enlarges LEFT (shrinks right), and vice versa.
     var newW = startW - dx;
     applyWidth(newW);
   }
@@ -1086,12 +1364,10 @@ if(micBtn){
     document.body.classList.remove('hs-resizing');
   }
 
-  // Mouse
   res.addEventListener('mousedown', function(e){ e.preventDefault(); onDown(e.clientX); });
   window.addEventListener('mousemove', function(e){ onMove(e.clientX); });
   window.addEventListener('mouseup', onUp);
 
-  // Touch
   res.addEventListener('touchstart', function(e){
     if(!e.touches || !e.touches[0]) return;
     e.preventDefault();
@@ -1103,10 +1379,8 @@ if(micBtn){
   }, {passive:false});
   window.addEventListener('touchend', onUp);
 
-  // Ensure panel visible by default (we're using a slider, not the old toggle)
   document.body.classList.remove('panel-collapsed');
 
-  // Keep within bounds when window resizes
   window.addEventListener('resize', function(){
     var cur = right.getBoundingClientRect().width;
     var mx = computeMax();
@@ -1142,7 +1416,7 @@ if(micBtn){
   });
 })();
 
-/* === 새로만들기 전용 안전 바인딩 === */
+/* === 새로만들기 === */
 (function(){
   var menu = document.getElementById('fileMenu');
   if(!menu) return;
@@ -1155,7 +1429,10 @@ if(micBtn){
       if (typeof ws !== 'undefined' && ws && typeof ws.clear === 'function'){
         if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
           try{ ws.clear(); }catch(_){}
-          try{ if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs && typeof multiServoConfigs.clear==='function') multiServoConfigs.clear(); }catch(_){}
+          try{
+            if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs &&
+               typeof multiServoConfigs.clear==='function') multiServoConfigs.clear();
+          }catch(_){}
           try{ if(typeof refreshCodeDebounced === 'function') refreshCodeDebounced(); }catch(_){}
           try{ if(typeof log === 'function') log('🆕 새 프로젝트'); }catch(_){}
         }
@@ -1164,14 +1441,14 @@ if(micBtn){
           location.reload();
         }
       }
-    }catch(_){ /* no-op */ }
+    }catch(_){}
   });
 })();
 </script>
 
 <script id="xrobo-kp4x4-v14-script">
+/* (원본과 동일: 안드로이드 전용 숫자 키패드) */
 (function(){
-  // Only enable keypad on Android; on desktop Chrome, keypad is disabled.
   if(!/Android/i.test(navigator.userAgent||'')) { return; }
 
   'use strict';
@@ -1180,16 +1457,14 @@ if(micBtn){
   const hasPointer = 'PointerEvent' in window;
 
   let pad, disp, grid;
-  let activeInput = null;     // html input (if captured)
-  let activeField = null;     // Blockly field instance (FieldNumber)
-  let promptCallback = null;  // prompt override
+  let activeInput = null;
+  let activeField = null;
+  let promptCallback = null;
   let buffer = '';
   let rafId = 0;
   let lastAnchor = {x: window.innerWidth/2, y: 140};
   let outsideBound = false;
   let committing = false;
-
-  // press dedup (for some Androids firing twice)
   let lastPressLabel = '';
   let lastPressTime = 0;
   const PRESS_DEBOUNCE_MS = 160;
@@ -1200,7 +1475,8 @@ if(micBtn){
     if(!expr) return NaN;
     const tokens = expr.match(/(\d+|[+\-*/])/g) || [];
     if(tokens.length===0) return NaN;
-    const values=[], ops=[]; let expectNum=true, unary=null;
+    const values=[], ops=[];
+    let expectNum=true, unary=null;
     function prec(op){ return (op==='*'||op==='/')?2:1; }
     function apply(){ const op=ops.pop(), b=values.pop(), a=values.pop();
       values.push(op==='+'?a+b: op==='-'?a-b: op==='*'?a*b: (b===0?0:Math.trunc(a/b))); }
@@ -1215,7 +1491,9 @@ if(micBtn){
     while(ops.length) apply();
     return values.length? values[0]:NaN;
   }
-  function dispatch(el, type){ try{ el.dispatchEvent(new Event(type, {bubbles:true})); }catch(_){ } }
+  function dispatch(el, type){
+    try{ el.dispatchEvent(new Event(type, {bubbles:true})); }catch(_){}
+  }
 
   function buildPad(){
     if(pad) return pad;
@@ -1254,7 +1532,8 @@ if(micBtn){
 
     function getButtonFromEvent(e){
       if(e.type==='touchstart' && e.touches && e.touches[0]){
-        const t=e.touches[0]; const el=document.elementFromPoint(t.clientX, t.clientY);
+        const t=e.touches[0];
+        const el=document.elementFromPoint(t.clientX, t.clientY);
         return el && el.closest && el.closest('button');
       }
       return e.target && e.target.closest && e.target.closest('button');
@@ -1297,7 +1576,6 @@ if(micBtn){
 
     return pad;
   }
-
   function showPad(){ buildPad().classList.add('show'); }
   function hidePad(){ if(pad) pad.classList.remove('show'); }
 
@@ -1326,7 +1604,12 @@ if(micBtn){
 
   function startFollowInput(input){
     cancelAnimationFrame(rafId);
-    const tick=()=>{ if(activeInput){ positionNearInput(input); rafId=requestAnimationFrame(tick);} };
+    const tick=()=>{
+      if(activeInput){
+        positionNearInput(input);
+        rafId=requestAnimationFrame(tick);
+      }
+    };
     tick();
   }
   function stopFollow(){ cancelAnimationFrame(rafId); rafId=0; }
@@ -1362,7 +1645,8 @@ if(micBtn){
         try{ activeField.setValue(ok ? val : buffer); }catch(_){}
         activeField = null;
       }else if(typeof promptCallback === 'function'){
-        const n = safeEval(buffer); const v = Number.isFinite(n) ? String(n) : buffer;
+        const n = safeEval(buffer);
+        const v = Number.isFinite(n) ? String(n) : buffer;
         try{ promptCallback(v); }catch(_){}
         promptCallback = null;
       }else if(activeInput){
@@ -1371,7 +1655,11 @@ if(micBtn){
         dispatch(activeInput,'input');
         dispatch(activeInput,'change');
       }
-      try{ if(window.Blockly && Blockly.WidgetDiv && typeof Blockly.WidgetDiv.hide==='function'){ Blockly.WidgetDiv.hide(); } }catch(_){}
+      try{
+        if(window.Blockly && Blockly.WidgetDiv && typeof Blockly.WidgetDiv.hide==='function'){
+          Blockly.WidgetDiv.hide();
+        }
+      }catch(_){}
       activeInput = null;
       stopFollow(); hidePad();
     }finally{
@@ -1557,8 +1845,15 @@ if(micBtn){
       try{
         const uaOk = /Android/i.test(navigator.userAgent||'');
         if(uaOk && t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
-          try{ t.setAttribute('inputmode','none'); t.setAttribute('autocomplete','off'); t.setAttribute('autocorrect','off'); }catch(_){}
-          try{ t.setAttribute('readonly','readonly'); setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0); }catch(_){}
+          try{
+            t.setAttribute('inputmode','none');
+            t.setAttribute('autocomplete','off');
+            t.setAttribute('autocorrect','off');
+          }catch(_){}
+          try{
+            t.setAttribute('readonly','readonly');
+            setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0);
+          }catch(_){}
           openForInput(t, null);
           const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
           t.addEventListener('blur', onBlur);
@@ -1574,7 +1869,9 @@ if(micBtn){
     if(hasPointer) root.addEventListener('pointerdown', savePt, true);
     else{
       root.addEventListener('mousedown', savePt, true);
-      root.addEventListener('touchstart', (e)=>{ if(e.touches&&e.touches[0]) lastAnchor={x:e.touches[0].clientX, y:e.touches[0].clientY}; }, {capture:true, passive:true});
+      root.addEventListener('touchstart', (e)=>{
+        if(e.touches&&e.touches[0]) lastAnchor={x:e.touches[0].clientX, y:e.touches[0].clientY};
+      }, {capture:true, passive:true});
     }
   })();
 
@@ -1584,7 +1881,8 @@ if(micBtn){
   }else{
     window.addEventListener('DOMContentLoaded', tryPatch);
   }
-  let tries=0; const iv=setInterval(()=>{ tryPatch(); if(++tries>12) clearInterval(iv); }, 300);
+  let tries=0;
+  const iv=setInterval(()=>{ tryPatch(); if(++tries>12) clearInterval(iv); }, 300);
 
 })();
 </script>
