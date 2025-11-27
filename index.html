@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>XROBO BLE — 음성 명령</title>
+<title>XROBO BLE — 음성 명령 디버그</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <script src="https://unpkg.com/blockly/blockly.min.js"></script>
 
@@ -12,18 +12,26 @@
     --uiScale: 1;
     --headerH: 64px;
     --btnH: 36px;
+
     --gap: 8px;
     --headerBgTop: #fff7ed;
     --headerBgBottom: #fffbeb;
     --headerBorder: #fed7aa;
     --logH: 180px;
     --blue: #1d4ed8;
+
     --rightW: 40%;
   }
+
   *{ box-sizing:border-box; }
   html, body{ height:100%; }
-  body{ margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#fff; }
+  body{
+    margin:0;
+    font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:#fff;
+  }
 
+  /* ── 헤더 ───────────────────────────────── */
   header{
     padding: 8px 12px;
     background: linear-gradient(180deg, var(--headerBgTop), var(--headerBgBottom));
@@ -31,7 +39,8 @@
     position:relative; z-index:10;
   }
   #topbar{
-    display:flex; align-items:center; gap: calc(var(--gap) * var(--uiScale));
+    display:flex; align-items:center;
+    gap: calc(var(--gap) * var(--uiScale));
     flex-wrap: wrap;
   }
   .title{
@@ -74,6 +83,7 @@
   .badgeDot.on{ background:#3b82f6; }
   .badgeDot.off{ background:#ef4444; }
 
+  /* ── 레이아웃 ─────────────────────────── */
   #main{ display:flex; width:100%; height: calc(100vh - var(--headerH)); }
   #left{ position:relative; flex:1 1 auto; min-width:0; height:100%; display:flex; overflow:visible; }
   #blocklyDiv{ flex:1 1 auto; min-width:0; height:100%; width:100%; }
@@ -86,6 +96,7 @@
     position:relative;
   }
 
+  /* ── 우측 상단: 음성 패널 ── */
   #rightTop{
     flex:1 1 auto; border-bottom:1px solid #e5e7eb; min-height: 120px;
     background:#020617; color:#fff;
@@ -123,12 +134,35 @@
     from{ transform:scale(1); box-shadow:0 0 0 4px rgba(251,146,60,.55), 0 14px 32px rgba(0,0,0,.7); }
     to{   transform:scale(1.08); box-shadow:0 0 0 8px rgba(251,146,60,.2), 0 20px 46px rgba(0,0,0,.9); }
   }
-  .voiceInfo{ flex:1 1 auto; display:flex; flex-direction:column; gap:6px; }
-  .voiceStatus{ font-size:13px; font-weight:700; color:#93c5fd; }
-  .voiceText{ font-size:14px; font-weight:500; color:#e5e7eb; min-height:2.2em; word-break:break-all; }
-  .voiceHint{ margin-top:6px; font-size:11px; color:#6b7280; }
+  .voiceInfo{
+    flex:1 1 auto;
+    display:flex; flex-direction:column;
+    gap:6px;
+  }
+  .voiceStatus{
+    font-size:13px;
+    font-weight:700;
+    color:#93c5fd;
+    letter-spacing:.02em;
+  }
+  .voiceText{
+    font-size:14px;
+    font-weight:500;
+    color:#e5e7eb;
+    min-height:2.2em;
+    word-break:break-all;
+  }
+  .voiceHint{
+    margin-top:6px;
+    font-size:11px;
+    color:#6b7280;
+  }
 
-  #rightDivider{ flex:0 0 6px; cursor: row-resize; background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px); }
+  #rightDivider{
+    flex:0 0 6px;
+    cursor: row-resize;
+    background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px);
+  }
 
   #rightBottom{
     flex: 0 0 var(--logH);
@@ -144,23 +178,43 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
-  #hResizer{
-    flex: 0 0 8px;
-    background: linear-gradient(90deg,#e5e7eb,#d1d5db);
-    border-left: 1px solid #cbd5e1;
-    border-right: 1px solid #cbd5e1;
-    cursor: col-resize;
-    touch-action: none;
-    margin: 8px 0;
+  #panelHandle{
+    position:absolute; top: calc(12px * var(--uiScale)); right: 0;
+    z-index:999; width: 22px; height: 28px;
+    background: var(--blue); border: 0; border-radius: calc(6px * var(--uiScale));
+    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer; padding: 0;
   }
-  body.hs-resizing, body.hs-resizing *{
-    cursor: col-resize !important;
-    user-select: none !important;
+  #panelHandle::before{
+    content:''; position:absolute; top:0; right:-3px;
+    width:3px; height:100%; background: var(--blue);
+    border-top-right-radius: calc(6px * var(--uiScale)); border-bottom-right-radius: calc(6px * var(--uiScale));
+  }
+  #panelHandle::after{
+    content:''; position:absolute; top:50%; transform: translateY(-50%);
+    width:0; height:0; border-style: solid;
+  }
+  #panelHandle.open::after{
+    left: 4px;
+    border-width: 6px 0 6px 7px;
+    border-color: transparent transparent transparent white;
+  }
+  #panelHandle.closed::after{
+    left: 4px;
+    border-width: 6px 7px 6px 0;
+    border-color: transparent white transparent transparent;
   }
 
+  .blocklyZoom,.blocklyTrash{ display:block !important; }
+  .blocklyTrashLid, .blocklyTrashcanLid, .blocklyTrashCanLid { display:none !important; }
+
+  body.fs-active #main{ height: calc(100vh - var(--headerH)); }
+  body.panel-collapsed #right{ display:none; }
+  body.panel-collapsed #left{ flex:1 1 100%; }
+
+  /* 전체화면 오버레이 */
   #playOverlay{
     position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:10000;
-    touch-action:none; overscroll-behavior:contain;
+    touch-action:none; overscroll-behavior:contain; -webkit-tap-highlight-color:transparent;
   }
   #playOverlay.show{ display:flex; flex-direction:column; }
   #playOverlay .body{
@@ -168,8 +222,11 @@
     display:flex; align-items:center; justify-content:center;
     background:#020617;
   }
-  #overlayVoiceWrap{ width:100%; max-width:480px; }
+  #overlayVoiceWrap{
+    width:100%; max-width:480px;
+  }
 
+  /* 파일 드롭다운 */
   .dropdown{ position:relative; }
   .dropdown .menu{
     position:absolute; right:0; top:calc(100% + 4px);
@@ -187,45 +244,44 @@
   .dropdown .menu > button:hover{ background:#f3f4f6; }
   #fileBtn{ background:#6b7280; color:#ffffff; }
 
-  /* 숫자패드 스타일 */
-  :root { --xroboKpScale: .7; }
-  #xrobo-kp4x4-v14{
-    position:absolute; left:0; top:0; display:none; z-index:2147483647;
-    background:#000; border:2px solid #000; border-radius:calc(16px * var(--xroboKpScale));
-    padding: calc(12px * var(--xroboKpScale)); box-shadow:0 16px 46px rgba(0,0,0,.45);
-    user-select:none; touch-action:manipulation;
+  /* 좌우 리사이저 */
+  #hResizer{
+    flex: 0 0 8px;
+    background: linear-gradient(90deg,#e5e7eb,#d1d5db);
+    border-left: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    cursor: col-resize;
+    touch-action: none;
+    margin: 8px 0;
   }
-  #xrobo-kp4x4-v14.show{ display:block; }
-  #xrobo-kp4x4-v14 .display{
-    margin-bottom:calc(10px * var(--xroboKpScale)); background:#0b0f14; color:#e5e7eb;
-    border:1px solid #1f2937; border-radius:calc(10px * var(--xroboKpScale));
-    padding:calc(10px * var(--xroboKpScale)) calc(12px * var(--xroboKpScale));
-    font-weight:800; font-size:calc(18px * var(--xroboKpScale)); letter-spacing:.6px; min-height:24px;
+  body.hs-resizing, body.hs-resizing *{
+    cursor: col-resize !important;
+    user-select: none !important;
   }
-  #xrobo-kp4x4-v14 .grid{
-    display:grid; grid-template-columns: repeat(4, calc(56px * var(--xroboKpScale)));
-    grid-auto-rows: calc(56px * var(--xroboKpScale));
-    gap: calc(10px * var(--xroboKpScale));
+
+  /* 토스트 */
+  #xroboToast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%) translateY(0);
+    padding:8px 14px;
+    border-radius:999px;
+    background:rgba(0,0,0,.85);
+    color:#fff;
+    font-size:13px;
+    font-weight:600;
+    opacity:0;
+    pointer-events:none;
+    z-index:99999;
+    transition:opacity .18s ease, transform .18s ease;
   }
-  #xrobo-kp4x4-v14 button{
-    border:0; border-radius:calc(12px * var(--xroboKpScale)); background:#fff; color:#111;
-    font-weight:900; font-size:calc(20px * var(--xroboKpScale));
-    box-shadow:0 calc(4px * var(--xroboKpScale)) calc(14px * var(--xroboKpScale)) rgba(0,0,0,.22);
-    cursor:pointer;
-  }
-  #xrobo-kp4x4-v14 button:active{ transform:translateY(1px); }
-  #xrobo-kp4x4-v14 .op{ background:#e6eefc; color:#0b3aa6; font-weight:800; }
-  #xrobo-kp4x4-v14 .back{ background:#111827; color:#fff; font-size:calc(18px * var(--xroboKpScale)); }
-  #xrobo-kp4x4-v14 .clear{ background:#e5e7eb; color:#111827; font-size:calc(16px * var(--xroboKpScale)); font-weight:800; }
-  #xrobo-kp4x4-v14 .wide{ grid-column: span 2; height:calc(56px * var(--xroboKpScale)); font-size:calc(18px * var(--xroboKpScale)); font-weight:800; }
-  #xrobo-kp4x4-v14 .ok{ background:#2563eb; color:#fff; }
-  #xrobo-kp4x4-v14 .cancel{ background:#6b7280; color:#fff; }
 </style>
 </head>
 <body>
 <header id="appHeader">
   <div id="topbar">
-    <div class="title">XROBO test — 음성 명령</div>
+    <div class="title">XROBO v10 — 음성 명령 디버그</div>
     <div class="spacer"></div>
 
     <div class="dropdown" id="fileDropdown">
@@ -242,13 +298,18 @@
 
     <button id="testBtn" class="btn" title="코딩 화면에서 테스트 실행">테스트</button>
     <button id="runToggle" class="btn" title="전체화면 실행">실행</button>
+
     <button id="fsBtn" class="btn" title="전체화면">전체화면</button>
   </div>
 </header>
 
 <div id="main">
-  <div id="left"><div id="blocklyDiv"></div></div>
-  <div id="hResizer" class="hsplit" title="좌우 크기 조절 바"></div>
+  <div id="left">
+    <div id="blocklyDiv"></div>
+    <button id="panelHandle" class="open" title="실행창 닫기"></button>
+  </div>
+
+  <div id="hResizer" title="좌우 크기 조절 바"></div>
 
   <div id="right">
     <div id="rightTop">
@@ -269,11 +330,11 @@
   </div>
 </div>
 
-<!-- 툴박스: 이벤트 + 테스트 블록 -->
+<!-- 툴박스 -->
 <xml id="toolbox" style="display:none">
   <category name="이벤트" colour="#f59e0b">
-    <block type="xrobo_voice_start"></block>
-    <block type="xrobo_test_voice"></block>
+    <block type="xvoice_start"></block>
+    <block type="xvoice_test"></block>
   </category>
   <category name="출력" colour="#60a5fa">
     <block type="motor12_dd">
@@ -305,7 +366,7 @@
   </category>
 </xml>
 
-<!-- 전체화면 음성 오버레이 -->
+<!-- 전체화면 오버레이 -->
 <div id="playOverlay" aria-hidden="true">
   <div class="body">
     <div id="overlayVoiceWrap" class="voiceWrap">
@@ -318,6 +379,9 @@
     </div>
   </div>
 </div>
+
+<!-- 토스트 -->
+<div id="xroboToast"></div>
 
 <script>
 /* ========== Blockly 기본 세팅 ========== */
@@ -374,9 +438,8 @@ var ws = Blockly.inject('blocklyDiv', {
   }catch(e){}
 })();
 
-/* ========== 블록 정의 (새 이벤트 + 테스트 블록) ========== */
-var PINS_OUT=[["OUT1","OUT1"],["OUT2","OUT2"],["OUT3","OUT3"],["OUT4","OUT4"],
-              ["OUT5","OUT5"],["OUT6","OUT6"],["OUT7","OUT7"],["OUT8","OUT8"]];
+/* ========== 블록 정의 ========== */
+var PINS_OUT=[["OUT1","OUT1"],["OUT2","OUT2"],["OUT3","OUT3"],["OUT4","OUT4"],["OUT5","OUT5"],["OUT6","OUT6"],["OUT7","OUT7"],["OUT8","OUT8"]];
 var SPEEDS=Array.from({length:41},(_,i)=>20-i).map(v=>[String(v),String(v)]);
 var TIMES100=Array.from({length:10},(_,i)=>100*(i+1)).map(v=>[String(v),String(v)]);
 var LED_TGT=[].concat(PINS_OUT,[["CPU","CPU"]]);
@@ -385,7 +448,7 @@ var LED_VALS=Array.from({length:20},(_,i)=>[String(i),String(i)]);
 
 Blockly.defineBlocksWithJsonArray([
   {
-    "type":"xrobo_voice_start",
+    "type":"xvoice_start",
     "message0":"말하기 %1 가 들리면",
     "args0":[ { "type":"field_input","name":"PHRASE","text":"안녕" } ],
     "nextStatement":null,
@@ -393,7 +456,7 @@ Blockly.defineBlocksWithJsonArray([
     "hat":"cap"
   },
   {
-    "type":"xrobo_test_voice",
+    "type":"xvoice_test",
     "message0":"테스트 %1 테스트 중",
     "args0":[ { "type":"field_input","name":"TEXT","text":"테스트" } ],
     "previousStatement":null,
@@ -455,7 +518,7 @@ Blockly.defineBlocksWithJsonArray([
   }
 ]);
 
-/* ========== 코드 / 이벤트 프로그램 ========== */
+/* ========== 코드 빌더 ========== */
 function numFromInput(parent, name, def){
   if (def===void 0) def=0;
   var raw = Blockly.JavaScript.valueToCode(parent, name, Blockly.JavaScript.ORDER_NONE);
@@ -472,10 +535,10 @@ function walkNode(b, list){
       break;
     }
     case 'motor12_in':{
-      var v1n=numFromInput(b,'M1',0),
-          v2n=numFromInput(b,'M2',0),
+      var v1=numFromInput(b,'M1',0),
+          v2=numFromInput(b,'M2',0),
           msn=numFromInput(b,'MS',0);
-      list.push({type:'CMD',s:'M12 '+Math.round(v1n)+' '+Math.round(v2n)+' '+Math.round(msn)});
+      list.push({type:'CMD',s:'M12 '+Math.round(v1)+' '+Math.round(v2)+' '+Math.round(msn)});
       if(msn>0) list.push({type:'W',args:[msn]});
       break;
     }
@@ -507,11 +570,7 @@ function walkNode(b, list){
       if(s>0) list.push({type:'W',args:[s*1000]});
       break;
     }
-    case 'xrobo_test_voice':{
-      var txt = b.getFieldValue('TEXT') || '';
-      list.push({type:'LOG', text: txt});
-      break;
-    }
+    /* xvoice_test 는 동작 없음(텍스트 테스트용) */
   }
 }
 function walkChain(start, list){
@@ -545,7 +604,7 @@ function normalizeTrigger(str){
 }
 function buildEventPrograms(){
   var map = {};
-  var evs = ws.getBlocksByType('xrobo_voice_start', true);
+  var evs = ws.getBlocksByType('xvoice_start', true);
   for(var i=0;i<evs.length;i++){
     var block = evs[i];
     var raw = block.getFieldValue('PHRASE') || '';
@@ -563,7 +622,7 @@ function buildEventPrograms(){
   return map;
 }
 
-/* ========== 레이아웃/전체화면 ========== */
+/* ========== 레이아웃 / 전체화면 ========== */
 function applyHeaderHeight(){
   var px = document.getElementById('appHeader').offsetHeight || 64;
   document.documentElement.style.setProperty('--headerH', px+'px');
@@ -577,12 +636,14 @@ function applyUiScaleFromWorkspace(){
 window.addEventListener('resize', applyHeaderHeight);
 document.addEventListener('fullscreenchange', applyHeaderHeight);
 ws.addChangeListener(function(ev){
-  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){ applyUiScaleFromWorkspace(); }
+  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){
+    applyUiScaleFromWorkspace();
+  }
 });
 setInterval(function(){ applyUiScaleFromWorkspace(); }, 200);
 applyHeaderHeight();
 
-/* 오른쪽 로그 높이 리사이저 */
+/* 오른쪽 로그 리사이저 */
 (function(){
   var divider = document.getElementById('rightDivider');
   var root = document.documentElement;
@@ -618,7 +679,7 @@ applyHeaderHeight();
   divider.addEventListener('touchstart', onDown, {passive:false});
 })();
 
-/* 좌우 패널 리사이저 */
+/* 좌우 리사이저 */
 (function(){
   var res = document.getElementById('hResizer');
   var main = document.getElementById('main');
@@ -632,6 +693,7 @@ applyHeaderHeight();
   var maxW = 0;
 
   function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
   function computeMax(){
     var rect = main.getBoundingClientRect();
     var barW = res.getBoundingClientRect().width || 8;
@@ -646,6 +708,7 @@ applyHeaderHeight();
     computeMax();
     document.body.classList.add('hs-resizing');
   }
+
   function applyWidth(newW){
     newW = clamp(newW, 0, maxW);
     document.documentElement.style.setProperty('--rightW', newW + 'px');
@@ -654,12 +717,14 @@ applyHeaderHeight();
       try{ Blockly.svgResize(ws); }catch(e){}
     });
   }
+
   function onMove(clientX){
     if(!dragging) return;
     var dx = clientX - startX;
     var newW = startW - dx;
     applyWidth(newW);
   }
+
   function onUp(){
     dragging = false;
     document.body.classList.remove('hs-resizing');
@@ -679,7 +744,25 @@ applyHeaderHeight();
     onMove(e.touches[0].clientX);
   }, {passive:false});
   window.addEventListener('touchend', onUp);
+
+  document.body.classList.remove('panel-collapsed');
 })();
+
+/* 패널 토글 */
+var panelHandle=document.getElementById('panelHandle');
+function syncHandle(){
+  var collapsed = document.body.classList.contains('panel-collapsed');
+  panelHandle.classList.toggle('open',   !collapsed);
+  panelHandle.classList.toggle('closed',  collapsed);
+  panelHandle.title = collapsed ? '실행창 열기' : '실행창 닫기';
+}
+function togglePanel(){
+  document.body.classList.toggle('panel-collapsed');
+  syncHandle();
+  setTimeout(()=>{ Blockly.svgResize(ws); },60);
+}
+panelHandle.addEventListener('click', togglePanel);
+syncHandle();
 
 /* 전체화면 버튼 */
 var fsBtn=document.getElementById('fsBtn');
@@ -694,6 +777,7 @@ function syncFSLabel(){
   var a = !!document.fullscreenElement;
   document.body.classList.toggle('fs-active', a);
   fsBtn.textContent = a ? '화면축소' : '전체화면';
+  applyHeaderHeight();
 }
 fsBtn.onclick=async function(){
   if(document.fullscreenElement) await exitFS(); else await enterFS();
@@ -738,9 +822,11 @@ function connectBLE(){
         filters:[{ namePrefix:'XROBO' }],
         optionalServices:[SERVICE_UUID, 0xFFF3, 0xFFF4]
       });
-      try{ if (bleDevice && bleDevice.removeEventListener){
-        bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
-      }}catch(e){}
+      try{
+        if (bleDevice && bleDevice.removeEventListener){
+          bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+        }
+      }catch(e){}
       resetBleRefs();
       bleDevice=dev;
       if (bleDevice && bleDevice.addEventListener){
@@ -791,7 +877,7 @@ function disconnectBLE(){
 }
 btnConnect.onclick = ()=> isConnected ? disconnectBLE() : connectBLE();
 
-/* ========== 실행/큐 & 이벤트 매핑 ========== */
+/* ========== 실행/큐 & 이벤트 ========== */
 var eventPrograms = {};
 var queue = [];
 var queueBusy = false;
@@ -821,8 +907,6 @@ async function runList(list, localToken){
         if(localToken !== cancelToken) return;
         await runList(ins.body, localToken);
       }
-    }else if(ins.type==='LOG'){
-      log('🧪 테스트 블록: "'+ins.text+'"');
     }
   }
 }
@@ -834,7 +918,9 @@ async function processQueue(localToken){
       var item = queue.shift();
       await runList(item.list, localToken);
     }
-  }finally{ queueBusy = false; }
+  }finally{
+    queueBusy = false;
+  }
 }
 function triggerEvent(key){
   if(!isRunning) return;
@@ -842,7 +928,8 @@ function triggerEvent(key){
   if(!entry || !entry.list || !entry.list.length) return;
   queue.push({list: entry.list});
   log('▶ 이벤트 실행: "'+ (entry.label || key) + '"');
-  processQueue(cancelToken);
+  var myToken = cancelToken;
+  processQueue(myToken);
 }
 
 function startTest(){
@@ -880,7 +967,6 @@ async function stopRun(){
     if(writeChar) writeChar.writeValue(enc('S\n'));
   }catch(e){}
 }
-
 btnTest.onclick = ()=> { if(!isRunning) startTest(); };
 btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
 
@@ -1000,7 +1086,9 @@ function startVoiceRecognition(){
 if(voiceBtn) voiceBtn.addEventListener('click', startVoiceRecognition);
 if(overlayVoiceBtn) overlayVoiceBtn.addEventListener('click', startVoiceRecognition);
 
+/* 전체화면 더블탭 종료 */
 (function(){
+  var overlay = document.getElementById('playOverlay');
   if(!overlay) return;
   var lastTapTime = 0;
   overlay.addEventListener('pointerdown', function(e){
@@ -1017,6 +1105,7 @@ if(overlayVoiceBtn) overlayVoiceBtn.addEventListener('click', startVoiceRecognit
   }, {passive:true});
 })();
 
+/* 음성 → 이벤트 매칭 */
 function handleVoiceCommand(text){
   var key = normalizeTrigger(text);
   if(!key){
@@ -1047,7 +1136,7 @@ function handleVoiceCommand(text){
   hits.forEach(triggerEvent);
 }
 
-/* ========== 파일 메뉴 ========== */
+/* 파일 저장/불러오기 */
 function serializeProject(){
   var xmlDom = Blockly.Xml.workspaceToDom(ws);
   var xmlText = Blockly.Xml.domToText(xmlDom);
@@ -1114,6 +1203,8 @@ function loadProject(){
     }
   })();
 }
+
+/* 파일 메뉴 */
 (function(){
   var btn  = document.getElementById('fileBtn');
   var menu = document.getElementById('fileMenu');
@@ -1132,209 +1223,81 @@ function loadProject(){
     if(!t || !t.getAttribute) return;
     var cmd = t.getAttribute('data-cmd');
     if(!cmd) return;
-    if(cmd==='save') saveProject();
-    else if(cmd==='load') loadProject();
-    else if(cmd==='new'){
-      if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
-        ws.clear();
-        log('🆕 새 프로젝트');
+    try{
+      if(cmd==='save'){ saveProject(); }
+      else if(cmd==='load'){ loadProject(); }
+      else if(cmd==='new'){
+        if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
+          ws.clear();
+          log('🆕 새 프로젝트');
+        }
       }
-    }
+    }catch(_){}
     menu.classList.remove('show');
     menu.setAttribute('aria-hidden','true');
   });
 })();
 </script>
 
-<!-- ========== 숫자 필드 전용 안드로이드 숫자패드 (텍스트 블록은 OS 키보드) ========== -->
-<script id="xrobo-kp4x4-v16-script">
+<!-- ========== 토스트 + 필드 구분 디버깅 ========== -->
+<script>
 (function(){
-  if(!/Android/i.test(navigator.userAgent||'')) return;
+  const toastEl = document.getElementById('xroboToast');
+  function showToast(msg){
+    if(!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.style.opacity = '1';
+    toastEl.style.transform = 'translateX(-50%) translateY(-4px)';
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(()=>{
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateX(-50%) translateY(0)';
+    }, 1200);
+  }
+  window.xroboShowToast = showToast;
 
-  'use strict';
-  let pad=null, disp=null, grid=null;
-  let activeField=null, activeInput=null;
-  let buffer='';
+  function patchFields(){
+    if(!window.Blockly || !Blockly.FieldTextInput) return;
+    var TextProto = Blockly.FieldTextInput.prototype;
+    if(TextProto.__xrobo_toast_patched) return;
 
-  function buildPad(){
-    if(pad) return pad;
-    pad = document.createElement('div');
-    pad.id = 'xrobo-kp4x4-v14';
-    pad.innerHTML = '<div class="display"></div><div class="grid"></div>';
-    document.body.appendChild(pad);
-    disp = pad.querySelector('.display');
-    grid = pad.querySelector('.grid');
+    var NumberProto   = Blockly.FieldNumber   && Blockly.FieldNumber.prototype;
+    var DropdownProto = Blockly.FieldDropdown && Blockly.FieldDropdown.prototype;
 
-    const layout = [
-      {t:'1'},{t:'2'},{t:'3'},{t:'←',cls:'back'},
-      {t:'4'},{t:'5'},{t:'6'},{t:'C',cls:'clear'},
-      {t:'7'},{t:'8'},{t:'9'},{t:'+',cls:'op'},
-      {t:'*',cls:'op'},{t:'0'},{t:'/',cls:'op'},{t:'-',cls:'op'},
-      {t:'확인',cls:'wide ok'},{t:'취소',cls:'wide cancel'}
-    ];
-    layout.forEach(k=>{
-      const b=document.createElement('button');
-      b.type='button';
-      b.textContent=k.t;
-      if(k.cls) k.cls.split(/\s+/).forEach(c=>b.classList.add(c));
-      grid.appendChild(b);
-    });
-
-    function press(label){
-      if(label==='확인'){ commit(); return; }
-      if(label==='취소'){ cancel(); return; }
-      if(label==='C'){ buffer=''; syncDisplay(); return; }
-      if(label==='←'){ buffer=buffer.slice(0,-1); syncDisplay(); return; }
-      if(/^[0-9+\-*/]$/.test(label)){ buffer += label; syncDisplay(); return; }
-    }
-    function getBtn(e){
-      let t=e.target;
-      if(e.type==='touchstart' && e.touches && e.touches[0]){
-        const pt=e.touches[0];
-        t=document.elementFromPoint(pt.clientX,pt.clientY);
+    var origTextShow = TextProto.showEditor_;
+    TextProto.showEditor_ = function(){
+      // 숫자(FieldNumber)는 별도로 처리
+      if(!(Blockly.FieldNumber && this instanceof Blockly.FieldNumber)){
+        showToast('텍스트 입력을 누르셨습니다.');
       }
-      return t && t.closest && t.closest('button');
-    }
-    function onDown(e){
-      const btn=getBtn(e);
-      if(!btn) return;
-      e.preventDefault();
-      press(btn.textContent);
-    }
-    if('PointerEvent' in window) grid.addEventListener('pointerdown', onDown, true);
-    else if('ontouchstart' in window) grid.addEventListener('touchstart', onDown, {passive:false,capture:true});
-    else grid.addEventListener('mousedown', onDown, true);
-
-    document.addEventListener('pointerdown', function(e){
-      if(!pad || !pad.classList.contains('show')) return;
-      if(pad.contains(e.target) || e.target===activeInput) return;
-      commit();
-    }, true);
-
-    return pad;
-  }
-
-  function syncDisplay(){ if(disp) disp.textContent = buffer; }
-
-  function positionPadNearInput(input){
-    const rect=input.getBoundingClientRect();
-    const padRect=pad.getBoundingClientRect();
-    const gap=8, vx=window.scrollX, vy=window.scrollY;
-    let left=rect.right+gap+vx, top=rect.top+vy;
-    if(left+padRect.width>vx+innerWidth-6) left=rect.left-padRect.width-gap+vx;
-    if(top+padRect.height>vy+innerHeight-6) top=vy+innerHeight-padRect.height-6;
-    if(top<vy+6) top=vy+6;
-    pad.style.left=left+'px';
-    pad.style.top=top+'px';
-  }
-
-  function showPadForField(field){
-    const input = Blockly.FieldTextInput &&
-                  (Blockly.FieldTextInput.htmlInput_ ||
-                  (Blockly.WidgetDiv && Blockly.WidgetDiv.DIV &&
-                   Blockly.WidgetDiv.DIV.querySelector('input')));
-    if(!input) return;
-
-    buildPad();
-    activeField=field;
-    activeInput=input;
-    buffer = input.value || '';
-    syncDisplay();
-    pad.classList.add('show');
-
-    input.setAttribute('readonly','readonly');
-    input.setAttribute('inputmode','none');
-    setTimeout(()=>{ try{ input.blur(); }catch(e){} },0);
-
-    positionPadNearInput(input);
-  }
-
-  function hidePad(){
-    if(!pad) return;
-    pad.classList.remove('show');
-    if(activeInput){
-      activeInput.removeAttribute('readonly');
-      activeInput.removeAttribute('inputmode');
-    }
-    activeField=null;
-    activeInput=null;
-  }
-
-  function safeEval(expr){
-    expr=(expr||'').replace(/[^0-9+\-*/\s]/g,'').trim();
-    if(!expr) return NaN;
-    const tokens=expr.match(/(\d+|[+\-*/])/g) || [];
-    if(tokens.length===0) return NaN;
-    const values=[], ops=[];
-    let expectNum=true, unary=null;
-    const prec=op=> (op==='*'||op==='/')?2:1;
-    const apply=()=>{
-      const op=ops.pop(), b=values.pop(), a=values.pop();
-      if(op==='+') values.push(a+b);
-      else if(op==='-') values.push(a-b);
-      else if(op==='*') values.push(a*b);
-      else if(op==='/'){ if(b===0) values.push(0); else values.push(a/b); }
+      return origTextShow ? origTextShow.apply(this, arguments) : undefined;
     };
-    for(const tk of tokens){
-      if(/^\d+$/.test(tk)){
-        let v=parseInt(tk,10);
-        if(unary==='-') v=-v;
-        unary=null;
-        values.push(v);
-        expectNum=false;
-      }else{
-        if(expectNum){
-          if(tk==='+'||tk==='-') unary=tk;
-        }else{
-          while(ops.length && prec(ops[ops.length-1])>=prec(tk)) apply();
-          ops.push(tk);
-          expectNum=true;
-        }
-      }
+
+    if(NumberProto){
+      var origNumShow = NumberProto.showEditor_;
+      NumberProto.showEditor_ = function(){
+        showToast('숫자 입력을 누르셨습니다.');
+        return origNumShow ? origNumShow.apply(this, arguments) : undefined;
+      };
     }
-    while(ops.length) apply();
-    return values.length?values[0]:NaN;
-  }
+    if(DropdownProto){
+      var origDropShow = DropdownProto.showEditor_;
+      DropdownProto.showEditor_ = function(){
+        showToast('숫자 입력을 누르셨습니다.');
+        return origDropShow ? origDropShow.apply(this, arguments) : undefined;
+      };
+    }
 
-  function commit(){
-    if(!activeField || !activeInput){ hidePad(); return; }
-    let expr = buffer.trim();
-    let num = safeEval(expr);
-    if(!Number.isFinite(num)) num = Number(expr);
-    if(!Number.isFinite(num)) num = 0;
-    try{ activeField.setValue(num); }catch(e){}
-    hidePad();
-    try{
-      if(window.Blockly && Blockly.WidgetDiv && Blockly.WidgetDiv.hide){
-        Blockly.WidgetDiv.hide();
-      }
-    }catch(e){}
-  }
-  function cancel(){ hidePad(); }
-
-  function patch(){
-    if(!window.Blockly || !Blockly.FieldTextInput || !Blockly.FieldNumber) return;
-    if(Blockly.FieldTextInput.__xroboKpV16) return;
-
-    const proto = Blockly.FieldTextInput.prototype;
-    const origShow = proto.showEditor_;
-    proto.showEditor_ = function(opt_e){
-      const rv = origShow ? origShow.call(this, opt_e) : undefined;
-      if(this instanceof Blockly.FieldNumber){
-        setTimeout(()=>{ showPadForField(this); }, 0);
-      }
-      return rv;
-    };
-    Blockly.FieldTextInput.__xroboKpV16 = true;
+    TextProto.__xrobo_toast_patched = true;
   }
 
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', patch);
+    document.addEventListener('DOMContentLoaded', patchFields);
   }else{
-    patch();
+    patchFields();
   }
-  // 안전하게 한 번 더 시도
-  setTimeout(patch, 800);
+  // Blockly 로딩 지연 대비
+  setTimeout(patchFields, 1000);
 })();
 </script>
 
