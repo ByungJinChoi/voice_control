@@ -178,6 +178,7 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
+  /* 패널 핸들 (버튼) – 구조는 남기고, 화면에서는 숨김 */
   #panelHandle{
     position:absolute; top: calc(12px * var(--uiScale)); right: 0;
     z-index:999; width: 22px; height: 28px;
@@ -203,6 +204,8 @@
     border-width: 6px 7px 6px 0;
     border-color: transparent white transparent transparent;
   }
+  /* 👉 요청대로 파란 버튼 숨기기 */
+  #panelHandle{ display:none !important; }
 
   .blocklyZoom,.blocklyTrash{ display:block !important; }
   .blocklyTrashLid, .blocklyTrashcanLid, .blocklyTrashCanLid { display:none !important; }
@@ -281,7 +284,7 @@
 <body>
 <header id="appHeader">
   <div id="topbar">
-    <div class="title">XROBO v10 — 음성 명령 디버그</div>
+    <div class="title">XROBO BLE — 음성 명령 디버그</div>
     <div class="spacer"></div>
 
     <div class="dropdown" id="fileDropdown">
@@ -570,7 +573,6 @@ function walkNode(b, list){
       if(s>0) list.push({type:'W',args:[s*1000]});
       break;
     }
-    /* xvoice_test 는 동작 없음(텍스트 테스트용) */
   }
 }
 function walkChain(start, list){
@@ -748,7 +750,7 @@ applyHeaderHeight();
   document.body.classList.remove('panel-collapsed');
 })();
 
-/* 패널 토글 */
+/* 패널 토글 (버튼은 숨겨놨지만, 로직은 그대로 둡니다) */
 var panelHandle=document.getElementById('panelHandle');
 function syncHandle(){
   var collapsed = document.body.classList.contains('panel-collapsed');
@@ -1239,7 +1241,7 @@ function loadProject(){
 })();
 </script>
 
-<!-- ========== 토스트 + 필드 구분 디버깅 ========== -->
+<!-- ========== 토스트 + 키보드 막기 ========== -->
 <script>
 (function(){
   const toastEl = document.getElementById('xroboToast');
@@ -1256,30 +1258,59 @@ function loadProject(){
   }
   window.xroboShowToast = showToast;
 
+  function disableOsKeyboardForCurrentInput(){
+    try{
+      const input =
+        (Blockly.FieldTextInput && Blockly.FieldTextInput.htmlInput_) ||
+        (Blockly.WidgetDiv && Blockly.WidgetDiv.DIV &&
+         Blockly.WidgetDiv.DIV.querySelector('input,textarea'));
+      if(!input) return;
+
+      // OS 키보드가 뜨지 않도록 막기
+      input.setAttribute('readonly','readonly');
+      input.setAttribute('inputmode','none');
+      input.setAttribute('autocomplete','off');
+      input.setAttribute('autocorrect','off');
+      input.setAttribute('autocapitalize','off');
+      input.setAttribute('spellcheck','false');
+
+      // 혹시 포커스되면 바로 blur 해서 키보드가 안 뜨게 함
+      setTimeout(()=>{ try{ input.blur(); }catch(e){} }, 0);
+    }catch(e){}
+  }
+
   function patchFields(){
     if(!window.Blockly || !Blockly.FieldTextInput) return;
     var TextProto = Blockly.FieldTextInput.prototype;
-    if(TextProto.__xrobo_toast_patched) return;
+    if(TextProto.__xrobo_toast_noKb_patched) return;
 
     var NumberProto   = Blockly.FieldNumber   && Blockly.FieldNumber.prototype;
     var DropdownProto = Blockly.FieldDropdown && Blockly.FieldDropdown.prototype;
 
+    // 텍스트 필드 (이벤트 블록 등)
     var origTextShow = TextProto.showEditor_;
     TextProto.showEditor_ = function(){
-      // 숫자(FieldNumber)는 별도로 처리
+      // FieldNumber는 아래에서 따로 처리
       if(!(Blockly.FieldNumber && this instanceof Blockly.FieldNumber)){
         showToast('텍스트 입력을 누르셨습니다.');
       }
-      return origTextShow ? origTextShow.apply(this, arguments) : undefined;
+      var rv = origTextShow ? origTextShow.apply(this, arguments) : undefined;
+      disableOsKeyboardForCurrentInput();
+      return rv;
     };
 
+    // 숫자 필드
     if(NumberProto){
       var origNumShow = NumberProto.showEditor_;
       NumberProto.showEditor_ = function(){
         showToast('숫자 입력을 누르셨습니다.');
-        return origNumShow ? origNumShow.apply(this, arguments) : undefined;
+        var rv = origNumShow ? origNumShow.apply(this, arguments) : undefined;
+        disableOsKeyboardForCurrentInput();
+        return rv;
       };
     }
+
+    // 드롭다운도 숫자 입력 느낌으로 안내 (모터 20, 500ms 같은 곳)
     if(DropdownProto){
       var origDropShow = DropdownProto.showEditor_;
       DropdownProto.showEditor_ = function(){
@@ -1288,7 +1319,7 @@ function loadProject(){
       };
     }
 
-    TextProto.__xrobo_toast_patched = true;
+    TextProto.__xrobo_toast_noKb_patched = true;
   }
 
   if(document.readyState === 'loading'){
