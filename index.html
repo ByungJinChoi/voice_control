@@ -2,10 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>XROBO BLE — 음성 명령 디버그</title>
+<title>XROBO BLE — Voice Edition</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-
 <style>
   :root{
     --pad:10px;
@@ -20,16 +19,34 @@
     --logH: 180px;
     --blue: #1d4ed8;
 
-    --rightW: 40%;
+    --handleWBase: 22;
+    --handleHBase: 28;
+    --triWBase:   14;
+    --triHBase:   12;
+
+    --handleW: calc(var(--handleWBase) * var(--uiScale) * 1px);
+    --handleH: calc(var(--handleHBase) * var(--uiScale) * 1px);
+    --triW:    calc(var(--triWBase)    * var(--uiScale) * 1px);
+    --triH:    calc(var(--triHBase)    * var(--uiScale) * 1px);
+    --linkBar: calc(3 * var(--uiScale) * 1px);
+
+    --keyW: clamp(52px, 8vmin, 92px);
+    --keyH: calc(var(--keyW) * 2.7);
+    --keyGap: 6px;
+    --keyFont: 14px;
+
+    --eyesGap: 8vmin;
+    --eyeSize: 42vmin;
+    --pupilSize: 16vmin;
+    --blinkSpeed: 180ms;
+  }
+  @media (max-width: 480px){
+    :root{ --keyGap: 4px; --keyFont: 13px; }
   }
 
   *{ box-sizing:border-box; }
   html, body{ height:100%; }
-  body{
-    margin:0;
-    font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background:#fff;
-  }
+  body{ margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#fff; }
 
   /* ── 헤더 ───────────────────────────────── */
   header{
@@ -39,8 +56,7 @@
     position:relative; z-index:10;
   }
   #topbar{
-    display:flex; align-items:center;
-    gap: calc(var(--gap) * var(--uiScale));
+    display:flex; align-items:center; gap: calc(var(--gap) * var(--uiScale));
     flex-wrap: wrap;
   }
   .title{
@@ -60,6 +76,7 @@
     background:#f3f4f6; color:#111827; cursor:pointer;
     user-select:none;
   }
+  .btn.small{ height: calc(var(--btnH) * var(--uiScale) * .85); padding: 0 calc(10px * var(--uiScale)); font-size: calc(12px * var(--uiScale)); }
   #connectToggle{ background:#2563eb; color:#fff; }
   #testBtn{ background:#0ea5e9; color:#fff; }
   #runToggle{ background:#16a34a; color:#fff; }
@@ -89,8 +106,7 @@
   #blocklyDiv{ flex:1 1 auto; min-width:0; height:100%; width:100%; }
 
   #right{
-    flex:0 0 var(--rightW); width:var(--rightW); min-width:0;
-    display:flex; flex-direction:column; background:#fff;
+    flex:0 0 40%; display:flex; flex-direction:column; background:#fff;
     margin:8px 8px 8px 0; border:1px solid #e5e7eb; border-left:3px solid var(--blue);
     border-radius:12px 0 0 12px; box-shadow:0 2px 10px rgba(0,0,0,.04); overflow:hidden;
     position:relative;
@@ -158,12 +174,10 @@
     color:#6b7280;
   }
 
-  #rightDivider{
-    flex:0 0 6px;
-    cursor: row-resize;
-    background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px);
-  }
+  /* 리사이저 바 */
+  #rightDivider{ flex:0 0 6px; cursor: row-resize; background: repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 6px, #e5e7eb 6px, #e5e7eb 12px); }
 
+  /* 로그 패널 */
   #rightBottom{
     flex: 0 0 var(--logH);
     display:flex; flex-direction:column; min-height:0; overflow:hidden;
@@ -178,9 +192,31 @@
     font-size: calc(12px * var(--uiScale)); color:#d1e4ff;
   }
 
-  /* 파란 패널 핸들: 아예 숨김 */
-  #panelHandle{ display:none !important; }
-
+  #panelHandle{
+    position:absolute; top: calc(12px * var(--uiScale)); right: 0;
+    z-index:999; width: var(--handleW); height: var(--handleH);
+    background: var(--blue); border: 0; border-radius: calc(6px * var(--uiScale));
+    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer; padding: 0;
+  }
+  #panelHandle::before{
+    content:''; position:absolute; top:0; right: calc(0px - var(--linkBar));
+    width: var(--linkBar); height:100%; background: var(--blue);
+    border-top-right-radius: calc(6px * var(--uiScale)); border-bottom-right-radius: calc(6px * var(--uiScale));
+  }
+  #panelHandle::after{
+    content:''; position:absolute; top:50%; transform: translateY(-50%);
+    width:0; height:0; border-style: solid;
+  }
+  #panelHandle.open::after{
+    left: calc((var(--handleW) - var(--triW)) / 2);
+    border-width: var(--triH) 0 var(--triH) var(--triW);
+    border-color: transparent transparent transparent white;
+  }
+  #panelHandle.closed::after{
+    left: calc((var(--handleW) - var(--triW)) / 2);
+    border-width: var(--triH) var(--triW) var(--triH) 0;
+    border-color: transparent white transparent transparent;
+  }
   .blocklyZoom,.blocklyTrash{ display:block !important; }
   .blocklyTrashLid, .blocklyTrashcanLid, .blocklyTrashCanLid { display:none !important; }
 
@@ -188,7 +224,7 @@
   body.panel-collapsed #right{ display:none; }
   body.panel-collapsed #left{ flex:1 1 100%; }
 
-  /* 전체화면 오버레이 */
+  /* ── 전체화면 오버레이(음성 전용) ───────────────── */
   #playOverlay{
     position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:10000;
     touch-action:none; overscroll-behavior:contain; -webkit-tap-highlight-color:transparent;
@@ -203,7 +239,7 @@
     width:100%; max-width:480px;
   }
 
-  /* 파일 드롭다운 */
+  /* === 파일 드롭다운 === */
   .dropdown{ position:relative; }
   .dropdown .menu{
     position:absolute; right:0; top:calc(100% + 4px);
@@ -220,8 +256,10 @@
   }
   .dropdown .menu > button:hover{ background:#f3f4f6; }
   #fileBtn{ background:#6b7280; color:#ffffff; }
+</style>
 
-  /* 좌우 리사이저 */
+<style id="xrobo-hsplit-style">
+  :root{ --rightW: 40%; } /* initial right width */
   #hResizer{
     flex: 0 0 8px;
     background: linear-gradient(90deg,#e5e7eb,#d1d5db);
@@ -231,192 +269,160 @@
     touch-action: none;
     margin: 8px 0;
   }
-  body.hs-resizing, body.hs-resizing *{
-    cursor: col-resize !important;
-    user-select: none !important;
-  }
+  body.hs-resizing, body.hs-resizing *{ cursor: col-resize !important; user-select: none !important; }
+  #right{ flex: 0 0 var(--rightW) !important; width: var(--rightW) !important; min-width: 0 !important; }
+</style>
+<style id="single-change-hide-handle">
+  #panelHandle { display: none !important; }
+</style>
 
-  /* 토스트 */
-  #xroboToast{
-    position:fixed;
-    left:50%;
-    bottom:24px;
-    transform:translateX(-50%) translateY(0);
-    padding:8px 14px;
-    border-radius:999px;
-    background:rgba(0,0,0,.85);
-    color:#fff;
-    font-size:13px;
-    font-weight:600;
-    opacity:0;
-    pointer-events:none;
-    z-index:99999;
-    transition:opacity .18s ease, transform .18s ease;
+<style id="xrobo-kp4x4-v14-style">
+  :root { --xroboKpScale: .7; }
+  #xrobo-kp4x4-v14{
+    position:absolute; left:0; top:0; display:none; z-index:2147483647;
+    background:#000; border:2px solid #000; border-radius:calc(16px * var(--xroboKpScale));
+    padding: calc(12px * var(--xroboKpScale)); box-shadow:0 16px 46px rgba(0,0,0,.45);
+    user-select:none; touch-action:manipulation;
   }
-
-  /* 필드 팝업 (텍스트 박스) */
-  #xroboFieldPopup{
-    position:fixed;
-    inset:0;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:99998;
-    background:rgba(0,0,0,.35);
+  #xrobo-kp4x4-v14.show{ display:block; }
+  #xrobo-kp4x4-v14 .display{
+    margin-bottom:calc(10px * var(--xroboKpScale)); background:#0b0f14; color:#e5e7eb;
+    border:1px solid #1f2937; border-radius:calc(10px * var(--xroboKpScale));
+    padding:calc(10px * var(--xroboKpScale)) calc(12px * var(--xroboKpScale));
+    font-weight:800; font-size:calc(18px * var(--xroboKpScale)); letter-spacing:.6px; min-height:24px;
   }
-  #xroboFieldPopup .inner{
-    min-width:240px;
-    max-width:80vw;
-    background:#111827;
-    color:#e5e7eb;
-    border-radius:12px;
-    padding:14px 16px;
-    box-shadow:0 18px 40px rgba(0,0,0,.5);
+  #xrobo-kp4x4-v14 .grid{
+    display:grid; grid-template-columns: repeat(4, calc(56px * var(--xroboKpScale)));
+    grid-auto-rows: calc(56px * var(--xroboKpScale));
+    gap: calc(10px * var(--xroboKpScale));
   }
-  #xroboFieldPopup .title{
-    font-size:13px;
-    font-weight:700;
-    margin-bottom:6px;
-  }
-  #xroboFieldPopup .value{
-    font-family:ui-monospace, Menlo, Consolas, monospace;
-    font-size:13px;
-    padding:8px 10px;
-    border-radius:8px;
-    border:1px solid #4b5563;
-    background:#020617;
-    word-break:break-all;
-  }
-  #xroboFieldPopup .btnClose{
-    margin-top:10px;
-    padding:4px 10px;
-    border-radius:999px;
-    border:0;
-    background:#4b5563;
-    color:#e5e7eb;
-    font-size:12px;
+  #xrobo-kp4x4-v14 button{
+    border:0; border-radius:calc(12px * var(--xroboKpScale)); background:#fff; color:#111;
+    font-weight:900; font-size:calc(20px * var(--xroboKpScale));
+    box-shadow:0 calc(4px * var(--xroboKpScale)) calc(14px * var(--xroboKpScale)) rgba(0,0,0,.22);
     cursor:pointer;
-    float:right;
   }
+  #xrobo-kp4x4-v14 button:active{ transform:translateY(1px); }
+  #xrobo-kp4x4-v14 .op{ background:#e6eefc; color:#0b3aa6; font-weight:800; }
+  #xrobo-kp4x4-v14 .back{ background:#111827; color:#fff; font-size:calc(18px * var(--xroboKpScale)); }
+  #xrobo-kp4x4-v14 .clear{ background:#e5e7eb; color:#111827; font-size:calc(16px * var(--xroboKpScale)); font-weight:800; }
+  #xrobo-kp4x4-v14 .wide{ grid-column: span 2; height:calc(56px * var(--xroboKpScale)); font-size:calc(18px * var(--xroboKpScale)); font-weight:800; }
+  #xrobo-kp4x4-v14 .ok{ background:#2563eb; color:#fff; }
+  #xrobo-kp4x4-v14 .cancel{ background:#6b7280; color:#fff; }
 </style>
 </head>
 <body>
-<header id="appHeader">
-  <div id="topbar">
-    <div class="title">XROBO v11 — 음성 명령 디버그</div>
-    <div class="spacer"></div>
+  <!-- 헤더 -->
+  <header id="appHeader">
+    <div id="topbar">
+      <div class="title">XROBO BLE — 음성 명령</div>
+      <div class="spacer"></div>
 
-    <div class="dropdown" id="fileDropdown">
-      <button id="fileBtn" class="btn" title="파일">파일 ▾</button>
-      <div id="fileMenu" class="menu" role="menu" aria-hidden="true">
-        <button data-cmd="new" role="menuitem">새로만들기</button>
-        <button data-cmd="save" role="menuitem">저장하기</button>
-        <button data-cmd="load" role="menuitem">불러오기</button>
+      <!-- 파일 드롭다운 -->
+      <div class="dropdown" id="fileDropdown">
+        <button id="fileBtn" class="btn" title="파일">파일 ▾</button>
+        <div id="fileMenu" class="menu" role="menu" aria-hidden="true">
+          <button data-cmd="new" role="menuitem">새로만들기</button>
+          <button data-cmd="save" role="menuitem">저장하기</button>
+          <button data-cmd="load" role="menuitem">불러오기</button>
+        </div>
+      </div>
+
+      <span class="state"><span id="statusDot" class="badgeDot off">off</span></span>
+      <button id="connectToggle" class="btn">연결</button>
+
+      <!-- 테스트/실행 -->
+      <button id="testBtn" class="btn" title="코딩 화면에서 테스트 실행">테스트</button>
+      <button id="runToggle" class="btn" title="전체화면 실행">실행</button>
+
+      <button id="fsBtn" class="btn" title="전체화면">전체화면</button>
+    </div>
+  </header>
+
+  <!-- 본문 -->
+  <div id="main">
+    <div id="left">
+      <div id="blocklyDiv"></div>
+      <button id="panelHandle" class="open" title="실행창 닫기"></button>
+    </div>
+    <div id="hResizer" class="hsplit" title="좌우 크기 조절 바"></div>
+
+    <div id="right">
+      <!-- 우측 상단: 음성 패널 -->
+      <div id="rightTop">
+        <div class="voiceWrap" id="voiceWrap">
+          <button id="voiceBtn" class="voiceBtn" title="마이크 시작/정지">
+            🎤
+          </button>
+          <div class="voiceInfo">
+            <div id="voiceStatus" class="voiceStatus">대기 중</div>
+            <div id="voiceText" class="voiceText">마이크 버튼을 누른 뒤 3초 안에 말해 보세요.</div>
+            <div class="voiceHint">예시: “안녕”이 들리면 → 버저 소리</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="rightDivider" title="드래그하여 로그 높이 조절"></div>
+      <div id="rightBottom">
+        <div style="font-size:calc(12px * var(--uiScale));color:#9ca3af;">실행 로그</div>
+        <div id="log"></div>
       </div>
     </div>
-
-    <span class="state"><span id="statusDot" class="badgeDot off">off</span></span>
-    <button id="connectToggle" class="btn">연결</button>
-
-    <button id="testBtn" class="btn" title="코딩 화면에서 테스트 실행">테스트</button>
-    <button id="runToggle" class="btn" title="전체화면 실행">실행</button>
-
-    <button id="fsBtn" class="btn" title="전체화면">전체화면</button>
-  </div>
-</header>
-
-<div id="main">
-  <div id="left">
-    <div id="blocklyDiv"></div>
-    <!-- 파란 패널 버튼은 숨겨 두지만, 기존 코드와의 호환을 위해 DOM만 유지 -->
-    <button id="panelHandle" class="open" title="실행창 닫기"></button>
   </div>
 
-  <div id="hResizer" title="좌우 크기 조절 바"></div>
+  <!-- 툴박스 -->
+  <xml id="toolbox" style="display:none">
+    <category name="이벤트" colour="#f59e0b">
+      <block type="xrobo_start"></block>
+    </category>
+    <category name="출력" colour="#60a5fa">
+      <block type="motor12_dd">
+        <field name="M1">20</field><field name="M2">20</field><field name="MS">500</field>
+      </block>
+      <block type="motor12_in">
+        <value name="M1"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
+        <value name="M2"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
+        <value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value>
+      </block>
+      <block type="melody">
+        <field name="PITCH">C4</field>
+        <value name="DUR"><shadow type="math_number"><field name="NUM">200</field></shadow></value>
+        <value name="WAIT"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+      </block>
+      <block type="led_ctrl">
+        <field name="TGT">OUT1</field>
+        <field name="MODE">BRIGHT</field>
+        <field name="VAL">10</field>
+      </block>
+    </category>
+    <category name="제어" colour="#10b981">
+      <block type="controls_repeat_ext">
+        <value name="TIMES"><shadow type="math_number"><field name="NUM">3</field></shadow></value>
+      </block>
+      <block type="wait_seconds">
+        <value name="SEC"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
+      </block>
+    </category>
+  </xml>
 
-  <div id="right">
-    <div id="rightTop">
-      <div class="voiceWrap" id="voiceWrap">
-        <button id="voiceBtn" class="voiceBtn" title="마이크 시작/정지">🎤</button>
+  <!-- 전체화면 오버레이: 마이크 UI -->
+  <div id="playOverlay" aria-hidden="true">
+    <div class="body">
+      <div id="overlayVoiceWrap" class="voiceWrap">
+        <button id="overlayVoiceBtn" class="voiceBtn" title="마이크 시작/정지">
+          🎤
+        </button>
         <div class="voiceInfo">
-          <div id="voiceStatus" class="voiceStatus">대기 중</div>
-          <div id="voiceText" class="voiceText">마이크 버튼을 누른 뒤 3초 안에 말해 보세요.</div>
-          <div class="voiceHint">예시: “안녕”이 들리면 → 버저 소리</div>
+          <div id="overlayVoiceStatus" class="voiceStatus">대기 중</div>
+          <div id="overlayVoiceText" class="voiceText">전체 화면에서 말하면 이벤트 블록이 실행됩니다.</div>
+          <div class="voiceHint">힌트: 화면을 두 번 탭하면 실행이 종료됩니다.</div>
         </div>
       </div>
     </div>
-    <div id="rightDivider" title="드래그하여 로그 높이 조절"></div>
-    <div id="rightBottom">
-      <div style="font-size:calc(12px * var(--uiScale));color:#9ca3af;">실행 로그</div>
-      <div id="log"></div>
-    </div>
   </div>
-</div>
-
-<!-- 툴박스 -->
-<xml id="toolbox" style="display:none">
-  <category name="이벤트" colour="#f59e0b">
-    <block type="xvoice_start"></block>
-    <block type="xvoice_test"></block>
-  </category>
-  <category name="출력" colour="#60a5fa">
-    <block type="motor12_dd">
-      <field name="M1">20</field><field name="M2">20</field><field name="MS">500</field>
-    </block>
-    <block type="motor12_in">
-      <value name="M1"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
-      <value name="M2"><shadow type="math_number"><field name="NUM">20</field></shadow></value>
-      <value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value>
-    </block>
-    <block type="melody">
-      <field name="PITCH">C4</field>
-      <value name="DUR"><shadow type="math_number"><field name="NUM">200</field></shadow></value>
-      <value name="WAIT"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
-    </block>
-    <block type="led_ctrl">
-      <field name="TGT">OUT1</field>
-      <field name="MODE">BRIGHT</field>
-      <field name="VAL">10</field>
-    </block>
-  </category>
-  <category name="제어" colour="#10b981">
-    <block type="controls_repeat_ext">
-      <value name="TIMES"><shadow type="math_number"><field name="NUM">3</field></shadow></value>
-    </block>
-    <block type="wait_seconds">
-      <value name="SEC"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
-    </block>
-  </category>
-</xml>
-
-<!-- 전체화면 오버레이 -->
-<div id="playOverlay" aria-hidden="true">
-  <div class="body">
-    <div id="overlayVoiceWrap" class="voiceWrap">
-      <button id="overlayVoiceBtn" class="voiceBtn" title="마이크 시작/정지">🎤</button>
-      <div class="voiceInfo">
-        <div id="overlayVoiceStatus" class="voiceStatus">대기 중</div>
-        <div id="overlayVoiceText" class="voiceText">전체 화면에서 말하면 이벤트 블록이 실행됩니다.</div>
-        <div class="voiceHint">힌트: 화면을 두 번 탭하면 실행이 종료됩니다.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 토스트 -->
-<div id="xroboToast"></div>
-
-<!-- 필드 팝업 -->
-<div id="xroboFieldPopup">
-  <div class="inner">
-    <div class="title">입력 필드</div>
-    <div class="value"></div>
-    <button type="button" class="btnClose">닫기</button>
-  </div>
-</div>
 
 <script>
-/* ========== Blockly 기본 세팅 ========== */
+/* ================= Blockly 기본 설정 ================= */
 class XroboZelosProvider extends Blockly.zelos.ConstantProvider {
   constructor(){ super(); this.ADD_START_HATS = true; }
 }
@@ -440,8 +446,8 @@ var ws = Blockly.inject('blocklyDiv', {
   trashcan: true
 });
 
-/* SHIM */
-(function(){
+/* ▼▼ Blockly v12 변수 API 경고 제거용 SHIM ▼▼ */
+(function patchBlocklyDeprecated(){
   try{
     if (Blockly.Workspace && Blockly.Workspace.prototype && Blockly.Workspace.prototype.getAllVariables) {
       Blockly.Workspace.prototype.getAllVariables = function(){
@@ -451,9 +457,10 @@ var ws = Blockly.inject('blocklyDiv', {
     }
   }catch(e){}
 })();
+/* ▲▲ SHIM 끝 ▲▲ */
 
-/* 드래그 자동 스크롤 방지 */
-(function(){
+/* 드래그 중 자동 스크롤 방지 */
+(function disableAutoScrollWhileBlockDragging(){
   try{
     if (Blockly.BlockDragger && Blockly.BlockDragger.prototype) {
       var orig = Blockly.BlockDragger.prototype.updateDrag;
@@ -467,10 +474,10 @@ var ws = Blockly.inject('blocklyDiv', {
         };
       }
     }
-  }catch(e){}
+  }catch(e){ console.warn('AutoScroll patch failed', e); }
 })();
 
-/* ========== 블록 정의 ========== */
+/* ================= 상수/공용 ================= */
 var PINS_OUT=[["OUT1","OUT1"],["OUT2","OUT2"],["OUT3","OUT3"],["OUT4","OUT4"],["OUT5","OUT5"],["OUT6","OUT6"],["OUT7","OUT7"],["OUT8","OUT8"]];
 var SPEEDS=Array.from({length:41},(_,i)=>20-i).map(v=>[String(v),String(v)]);
 var TIMES100=Array.from({length:10},(_,i)=>100*(i+1)).map(v=>[String(v),String(v)]);
@@ -478,22 +485,17 @@ var LED_TGT=[].concat(PINS_OUT,[["CPU","CPU"]]);
 var LED_MODE=[["밝기","BRIGHT"],["숨쉬기","BREATHE"]];
 var LED_VALS=Array.from({length:20},(_,i)=>[String(i),String(i)]);
 
+/* ================= 블록 정의 ================= */
 Blockly.defineBlocksWithJsonArray([
   {
-    "type":"xvoice_start",
+    "type":"xrobo_start",
     "message0":"말하기 %1 가 들리면",
-    "args0":[ { "type":"field_input","name":"PHRASE","text":"안녕" } ],
+    "args0":[
+      { "type":"field_input","name":"PHRASE","text":"안녕" }
+    ],
     "nextStatement":null,
     "colour":36,
     "hat":"cap"
-  },
-  {
-    "type":"xvoice_test",
-    "message0":"테스트 %1 테스트 중",
-    "args0":[ { "type":"field_input","name":"TEXT","text":"테스트" } ],
-    "previousStatement":null,
-    "nextStatement":null,
-    "colour":36
   },
   {
     "type":"motor12_dd",
@@ -550,7 +552,7 @@ Blockly.defineBlocksWithJsonArray([
   }
 ]);
 
-/* ========== 코드 빌더 ========== */
+/* ================= 코드 빌더 ================= */
 function numFromInput(parent, name, def){
   if (def===void 0) def=0;
   var raw = Blockly.JavaScript.valueToCode(parent, name, Blockly.JavaScript.ORDER_NONE);
@@ -567,10 +569,10 @@ function walkNode(b, list){
       break;
     }
     case 'motor12_in':{
-      var v1=numFromInput(b,'M1',0),
-          v2=numFromInput(b,'M2',0),
+      var v1n=numFromInput(b,'M1',0),
+          v2n=numFromInput(b,'M2',0),
           msn=numFromInput(b,'MS',0);
-      list.push({type:'CMD',s:'M12 '+Math.round(v1)+' '+Math.round(v2)+' '+Math.round(msn)});
+      list.push({type:'CMD',s:'M12 '+Math.round(v1n)+' '+Math.round(v2n)+' '+Math.round(msn)});
       if(msn>0) list.push({type:'W',args:[msn]});
       break;
     }
@@ -626,6 +628,8 @@ function normalizeProgram(list){
   }
   return out;
 }
+
+/* 트리거 문자열 정규화 */
 function normalizeTrigger(str){
   return (str || '')
     .toLowerCase()
@@ -633,9 +637,11 @@ function normalizeTrigger(str){
     .replace(/[^\p{L}\p{N}]/gu,'')
     .trim();
 }
+
+/* 워크스페이스에서 이벤트 프로그램 빌드 */
 function buildEventPrograms(){
   var map = {};
-  var evs = ws.getBlocksByType('xvoice_start', true);
+  var evs = ws.getBlocksByType('xrobo_start', true);
   for(var i=0;i<evs.length;i++){
     var block = evs[i];
     var raw = block.getFieldValue('PHRASE') || '';
@@ -653,7 +659,7 @@ function buildEventPrograms(){
   return map;
 }
 
-/* ========== 레이아웃 / 전체화면 ========== */
+/* ================= 헤더/스케일/풀스크린 ================= */
 function applyHeaderHeight(){
   var px = document.getElementById('appHeader').offsetHeight || 64;
   document.documentElement.style.setProperty('--headerH', px+'px');
@@ -667,139 +673,12 @@ function applyUiScaleFromWorkspace(){
 window.addEventListener('resize', applyHeaderHeight);
 document.addEventListener('fullscreenchange', applyHeaderHeight);
 ws.addChangeListener(function(ev){
-  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){
-    applyUiScaleFromWorkspace();
-  }
+  if(ev && ev.type===Blockly.Events.UI && ev.element==='zoom'){ applyUiScaleFromWorkspace(); }
 });
 setInterval(function(){ applyUiScaleFromWorkspace(); }, 200);
 applyHeaderHeight();
 
-/* 오른쪽 로그 리사이저 */
-(function(){
-  var divider = document.getElementById('rightDivider');
-  var root = document.documentElement;
-  var dragging=false, startY=0, startH=0, rightH=0;
-  function pxToNum(px){ return Number(String(px).replace('px',''))||0; }
-  function onDown(e){
-    e.preventDefault();
-    dragging=true;
-    startY=('touches' in e ? e.touches[0].clientY : e.clientY);
-    startH=pxToNum(getComputedStyle(root).getPropertyValue('--logH'));
-    rightH=document.getElementById('right').clientHeight;
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', onMove, {passive:false});
-    window.addEventListener('mouseup', onUp, {once:true});
-    window.addEventListener('touchend', onUp, {once:true});
-  }
-  function onMove(e){
-    if(!dragging) return;
-    var y=('touches' in e ? e.touches[0].clientY : e.clientY);
-    if('touches' in e) e.preventDefault();
-    var delta = startY - y;
-    var nh = startH + delta;
-    var minH=90, maxH=Math.max(130, Math.floor(rightH*0.8));
-    nh=Math.min(maxH, Math.max(minH, nh));
-    root.style.setProperty('--logH', nh+'px');
-  }
-  function onUp(){
-    dragging=false;
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('touchmove', onMove);
-  }
-  divider.addEventListener('mousedown', onDown);
-  divider.addEventListener('touchstart', onDown, {passive:false});
-})();
-
-/* 좌우 리사이저 */
-(function(){
-  var res = document.getElementById('hResizer');
-  var main = document.getElementById('main');
-  var right = document.getElementById('right');
-  if(!res || !main || !right) return;
-
-  var dragging = false;
-  var startX = 0;
-  var startW = 0;
-  var rafId = 0;
-  var maxW = 0;
-
-  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-  function computeMax(){
-    var rect = main.getBoundingClientRect();
-    var barW = res.getBoundingClientRect().width || 8;
-    maxW = Math.max(0, rect.width - barW);
-    return maxW;
-  }
-
-  function onDown(clientX){
-    dragging = true;
-    startX = clientX;
-    startW = right.getBoundingClientRect().width;
-    computeMax();
-    document.body.classList.add('hs-resizing');
-  }
-
-  function applyWidth(newW){
-    newW = clamp(newW, 0, maxW);
-    document.documentElement.style.setProperty('--rightW', newW + 'px');
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(function(){
-      try{ Blockly.svgResize(ws); }catch(e){}
-    });
-  }
-
-  function onMove(clientX){
-    if(!dragging) return;
-    var dx = clientX - startX;
-    var newW = startW - dx;
-    applyWidth(newW);
-  }
-
-  function onUp(){
-    dragging = false;
-    document.body.classList.remove('hs-resizing');
-  }
-
-  res.addEventListener('mousedown', function(e){ e.preventDefault(); onDown(e.clientX); });
-  window.addEventListener('mousemove', function(e){ onMove(e.clientX); });
-  window.addEventListener('mouseup', onUp);
-
-  res.addEventListener('touchstart', function(e){
-    if(!e.touches || !e.touches[0]) return;
-    e.preventDefault();
-    onDown(e.touches[0].clientX);
-  }, {passive:false});
-  window.addEventListener('touchmove', function(e){
-    if(!e.touches || !e.touches[0]) return;
-    onMove(e.touches[0].clientX);
-  }, {passive:false});
-  window.addEventListener('touchend', onUp);
-
-  document.body.classList.remove('panel-collapsed');
-})();
-
-/* 전체화면 버튼 */
-var fsBtn=document.getElementById('fsBtn');
-async function enterFS(){
-  var el=document.documentElement;
-  if(el.requestFullscreen) await el.requestFullscreen();
-}
-async function exitFS(){
-  if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
-}
-function syncFSLabel(){
-  var a = !!document.fullscreenElement;
-  document.body.classList.toggle('fs-active', a);
-  fsBtn.textContent = a ? '화면축소' : '전체화면';
-  applyHeaderHeight();
-}
-fsBtn.onclick=async function(){
-  if(document.fullscreenElement) await exitFS(); else await enterFS();
-};
-document.addEventListener('fullscreenchange', syncFSLabel);
-
-/* ========== BLE & 로그 ========== */
+/* ================= BLE & 로그 ================= */
 var SERVICE_UUID=0xFFF0;
 var bleDevice=null,bleServer=null,bleService=null,writeChar=null,notifyChar=null;
 var isConnected=false, isRunning=false, isFullscreenRun=false;
@@ -811,6 +690,7 @@ var log=function(m){
 };
 var dot=$('statusDot');
 var btnConnect=$('connectToggle'), btnRun=$('runToggle'), btnTest=$('testBtn');
+
 var enc = s=> new TextEncoder().encode(s);
 
 function resetBleRefs(){ bleDevice=null; bleServer=null; bleService=null; writeChar=null; notifyChar=null; }
@@ -829,6 +709,7 @@ function setRunning(v){
   btnTest.disabled = v;
 }
 
+/* BLE connect/disconnect */
 function connectBLE(){
   if(!navigator.bluetooth){ alert('이 브라우저는 Web Bluetooth 미지원입니다.'); return; }
   (async function(){
@@ -837,11 +718,9 @@ function connectBLE(){
         filters:[{ namePrefix:'XROBO' }],
         optionalServices:[SERVICE_UUID, 0xFFF3, 0xFFF4]
       });
-      try{
-        if (bleDevice && bleDevice.removeEventListener){
-          bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
-        }
-      }catch(e){}
+      try{ if (bleDevice && bleDevice.removeEventListener){
+        bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+      }}catch(e){}
       resetBleRefs();
       bleDevice=dev;
       if (bleDevice && bleDevice.addEventListener){
@@ -878,281 +757,24 @@ function connectBLE(){
     }catch(e){
       console.error(e);
       log('❌ 연결 실패: '+e);
-      setConnected(false); resetBleRefs();
+      setConnected(false);
+      resetBleRefs();
     }
   })();
 }
 function onDisconnected(){
   log('🔌 해제됨');
-  setConnected(false); resetBleRefs();
+  setConnected(false);
+  resetBleRefs();
 }
 function disconnectBLE(){
   try{ if (bleDevice && bleDevice.gatt) bleDevice.gatt.disconnect(); }catch(e){}
-  setConnected(false); resetBleRefs();
+  setConnected(false);
+  resetBleRefs();
 }
 btnConnect.onclick = ()=> isConnected ? disconnectBLE() : connectBLE();
 
-/* ========== 실행/큐 & 이벤트 ========== */
-var eventPrograms = {};
-var queue = [];
-var queueBusy = false;
-var cancelToken = 0;
-
-function sendRaw(s){
-  if(!writeChar){
-    log('➡️(BLE 미연결) '+s);
-    return Promise.resolve();
-  }
-  return writeChar.writeValue(enc(s+'\n'))
-    .then(()=>{ log('➡️ '+s); })
-    .catch(e=>{ log('⚠️ 전송 실패: '+e); });
-}
-async function runList(list, localToken){
-  for(var i=0;i<list.length;i++){
-    var ins=list[i];
-    if(localToken !== cancelToken) return;
-    if(ins.type==='CMD'){
-      await sendRaw(ins.s);
-    }else if(ins.type==='W'){
-      var ms = (ins.args && ins.args[0]) ? ins.args[0] : 0;
-      if(ms>0) await new Promise(r=>setTimeout(r, ms));
-    }else if(ins.type==='FOR'){
-      for(var k=0;k<ins.count;k++){
-        if(localToken !== cancelToken) return;
-        await runList(ins.body, localToken);
-      }
-    }
-  }
-}
-async function processQueue(localToken){
-  if(queueBusy) return;
-  queueBusy = true;
-  try{
-    while(queue.length && localToken === cancelToken){
-      var item = queue.shift();
-      await runList(item.list, localToken);
-    }
-  }finally{
-    queueBusy = false;
-  }
-}
-function triggerEvent(key){
-  if(!isRunning) return;
-  var entry = eventPrograms[key];
-  if(!entry || !entry.list || !entry.list.length) return;
-  queue.push({list: entry.list});
-  log('▶ 이벤트 실행: "'+ (entry.label || key) + '"');
-  var myToken = cancelToken;
-  processQueue(myToken);
-}
-
-var overlay = document.getElementById('playOverlay');
-
-function startTest(){
-  if(isRunning) return;
-  eventPrograms = buildEventPrograms();
-  cancelToken++; queue = [];
-  isFullscreenRun = false;
-  setRunning(true);
-  log('▶ 테스트 실행 준비 완료 (음성 명령 대기)');
-}
-async function startFullRun(){
-  if(isRunning) return;
-  eventPrograms = buildEventPrograms();
-  cancelToken++; queue = [];
-  isFullscreenRun = true;
-  setRunning(true);
-
-  overlay.classList.add('show');
-  overlay.setAttribute('aria-hidden','false');
-  try{
-    if(overlay.requestFullscreen) await overlay.requestFullscreen();
-  }catch(e){}
-  log('▶ 전체화면 실행 시작 (음성 명령 대기)');
-}
-async function stopRun(){
-  cancelToken++; queue=[];
-  setRunning(false);
-  overlay.classList.remove('show');
-  overlay.setAttribute('aria-hidden','true');
-  isFullscreenRun = false;
-  try{
-    if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
-  }catch(e){}
-  try{
-    if(writeChar) writeChar.writeValue(enc('S\n'));
-  }catch(e){}
-}
-btnTest.onclick = ()=> { if(!isRunning) startTest(); };
-btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
-
-document.addEventListener('fullscreenchange', ()=>{
-  if (isFullscreenRun && !document.fullscreenElement){
-    stopRun();
-  }
-});
-document.addEventListener('keydown', (e)=>{
-  if (isFullscreenRun && e.key === 'Escape') stopRun();
-});
-
-/* ========== 음성 인식 ========== */
-var voiceBtn = document.getElementById('voiceBtn');
-var voiceStatus = document.getElementById('voiceStatus');
-var voiceText = document.getElementById('voiceText');
-
-var overlayVoiceBtn = document.getElementById('overlayVoiceBtn');
-var overlayVoiceStatus = document.getElementById('overlayVoiceStatus');
-var overlayVoiceText = document.getElementById('overlayVoiceText');
-
-var recognition=null, recognizing=false, listenTimer=null, lastTranscript='';
-
-function updateVoiceUI(state, msg){
-  if(voiceStatus){
-    if(state === 'idle')      voiceStatus.textContent = '대기 중';
-    else if(state === 'listening') voiceStatus.textContent = '듣는 중... (최대 3초)';
-    else if(state === 'thinking')  voiceStatus.textContent = '인식 중...';
-    else if(state === 'done')      voiceStatus.textContent = '인식 완료';
-    else if(state === 'error')     voiceStatus.textContent = '오류';
-  }
-  if(overlayVoiceStatus){
-    if(state === 'idle')      overlayVoiceStatus.textContent = '대기 중';
-    else if(state === 'listening') overlayVoiceStatus.textContent = '듣는 중... (최대 3초)';
-    else if(state === 'thinking')  overlayVoiceStatus.textContent = '인식 중...';
-    else if(state === 'done')      overlayVoiceStatus.textContent = '인식 완료';
-    else if(state === 'error')     overlayVoiceStatus.textContent = '오류';
-  }
-  if(typeof msg === 'string'){
-    if(voiceText) voiceText.textContent = msg;
-    if(overlayVoiceText) overlayVoiceText.textContent = msg;
-  }
-}
-function ensureSpeechRecognition(){
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){
-    alert('이 브라우저는 음성 인식을 지원하지 않습니다.\n(Chrome / Edge 기반 브라우저를 사용해 주세요)');
-    return null;
-  }
-  if(!recognition){
-    recognition = new SR();
-    recognition.lang = 'ko-KR';
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
-
-    recognition.onstart = function(){
-      recognizing = true;
-      if(voiceBtn) voiceBtn.classList.add('listening');
-      if(overlayVoiceBtn) overlayVoiceBtn.classList.add('listening');
-      updateVoiceUI('listening', '지금 말해 주세요...');
-    };
-    recognition.onerror = function(e){
-      recognizing = false;
-      if(voiceBtn) voiceBtn.classList.remove('listening');
-      if(overlayVoiceBtn) overlayVoiceBtn.classList.remove('listening');
-      clearTimeout(listenTimer);
-      log('❌ 음성 인식 오류: '+ (e && e.error ? e.error : e));
-      updateVoiceUI('error', '음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
-    };
-    recognition.onresult = function(event){
-      var interim='', finalText='';
-      for(var i=0;i<event.results.length;i++){
-        var res = event.results[i];
-        if(res.isFinal) finalText += res[0].transcript;
-        else interim += res[0].transcript;
-      }
-      var display = finalText || interim;
-      if(display){
-        updateVoiceUI('listening', display);
-        lastTranscript = display;
-      }
-    };
-    recognition.onend = function(){
-      recognizing = false;
-      if(voiceBtn) voiceBtn.classList.remove('listening');
-      if(overlayVoiceBtn) overlayVoiceBtn.classList.remove('listening');
-      clearTimeout(listenTimer);
-      if(lastTranscript){
-        updateVoiceUI('done', lastTranscript);
-        handleVoiceCommand(lastTranscript);
-      }else{
-        updateVoiceUI('idle', '인식된 문장이 없습니다. 다시 시도해 주세요.');
-      }
-    };
-  }
-  return recognition;
-}
-function startVoiceRecognition(){
-  var rec = ensureSpeechRecognition();
-  if(!rec) return;
-  if(recognizing){
-    try{ rec.stop(); }catch(e){}
-    return;
-  }
-  lastTranscript = '';
-  try{
-    rec.start();
-    updateVoiceUI('listening', '지금 말해 주세요...');
-    listenTimer = setTimeout(function(){
-      try{ rec.stop(); }catch(e){}
-    }, 3000);
-  }catch(e){
-    log('⚠️ 음성 인식 시작 실패: '+e);
-    updateVoiceUI('error', '음성 인식을 시작할 수 없습니다.');
-  }
-}
-if(voiceBtn) voiceBtn.addEventListener('click', startVoiceRecognition);
-if(overlayVoiceBtn) overlayVoiceBtn.addEventListener('click', startVoiceRecognition);
-
-/* 전체화면 더블탭 종료 */
-(function(){
-  var overlay = document.getElementById('playOverlay');
-  if(!overlay) return;
-  var lastTapTime = 0;
-  overlay.addEventListener('pointerdown', function(e){
-    var now = e.timeStamp || Date.now();
-    if(now - lastTapTime <= 300){
-      stopRun();
-      lastTapTime = 0;
-    }else{
-      lastTapTime = now;
-    }
-  }, {passive:true});
-  overlay.addEventListener('dblclick', function(){
-    stopRun();
-  }, {passive:true});
-})();
-
-/* 음성 → 이벤트 매칭 */
-function handleVoiceCommand(text){
-  var key = normalizeTrigger(text);
-  if(!key){
-    log('🎙 인식 결과가 비어 있습니다.');
-    return;
-  }
-  log('🎙 인식 문장: "'+ text + '"');
-
-  if(!isRunning){
-    log('ℹ️ 아직 실행 모드가 아닙니다. [테스트] 또는 [실행] 버튼을 먼저 눌러 주세요.');
-    return;
-  }
-
-  var hits = [];
-  for(var k in eventPrograms){
-    if(!Object.prototype.hasOwnProperty.call(eventPrograms,k)) continue;
-    if(!k) continue;
-    if(key === k || key.indexOf(k) >= 0 || k.indexOf(key) >= 0){
-      hits.push(k);
-    }
-  }
-  if(!hits.length){
-    log('❔ "'+ text + '" 에 해당하는 이벤트 블록을 찾지 못했습니다.');
-    if(overlayVoiceText) overlayVoiceText.textContent = text;
-    return;
-  }
-  if(overlayVoiceText) overlayVoiceText.textContent = text;
-  hits.forEach(triggerEvent);
-}
-
-/* 파일 저장/불러오기 */
+/* ================= 저장/불러오기 ================= */
 function serializeProject(){
   var xmlDom = Blockly.Xml.workspaceToDom(ws);
   var xmlText = Blockly.Xml.domToText(xmlDom);
@@ -1220,7 +842,443 @@ function loadProject(){
   })();
 }
 
-/* 파일 메뉴 */
+/* ================= 오른쪽 패널: 로그 리사이저 ================= */
+(function(){
+  var divider = document.getElementById('rightDivider');
+  var root = document.documentElement;
+  var dragging=false, startY=0, startH=0, rightH=0;
+  function pxToNum(px){ return Number(String(px).replace('px',''))||0; }
+  function onDown(e){
+    e.preventDefault();
+    dragging=true;
+    startY=('touches' in e ? e.touches[0].clientY : e.clientY);
+    startH=pxToNum(getComputedStyle(root).getPropertyValue('--logH'));
+    rightH=document.getElementById('right').clientHeight;
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('mouseup', onUp, {once:true});
+    window.addEventListener('touchend', onUp, {once:true});
+  }
+  function onMove(e){
+    if(!dragging) return;
+    var y=('touches' in e ? e.touches[0].clientY : e.clientY);
+    if('touches' in e) e.preventDefault();
+    var delta = startY - y;
+    var nh = startH + delta;
+    var minH=90, maxH=Math.max(130, Math.floor(rightH*0.8));
+    nh=Math.min(maxH, Math.max(minH, nh));
+    root.style.setProperty('--logH', nh+'px');
+  }
+  function onUp(){
+    dragging=false;
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('touchmove', onMove);
+  }
+  divider.addEventListener('mousedown', onDown);
+  divider.addEventListener('touchstart', onDown, {passive:false});
+})();
+
+/* ================= 패널 토글 & 전체화면 버튼 ================= */
+var panelHandle=document.getElementById('panelHandle');
+function syncHandle(){
+  var collapsed = document.body.classList.contains('panel-collapsed');
+  panelHandle.classList.toggle('open',   !collapsed);
+  panelHandle.classList.toggle('closed',  collapsed);
+  panelHandle.title = collapsed ? '실행창 열기' : '실행창 닫기';
+}
+function togglePanel(){
+  document.body.classList.toggle('panel-collapsed');
+  syncHandle();
+  setTimeout(()=>{ Blockly.svgResize(ws); },60);
+}
+panelHandle.addEventListener('click', togglePanel);
+syncHandle();
+
+var fsBtn=document.getElementById('fsBtn');
+async function enterFS(){
+  var el=document.documentElement;
+  if(el.requestFullscreen) await el.requestFullscreen();
+}
+async function exitFS(){
+  if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+}
+function syncFSLabel(){
+  var a = !!document.fullscreenElement;
+  document.body.classList.toggle('fs-active', a);
+  fsBtn.textContent = a ? '화면축소' : '전체화면';
+  fsBtn.title = a ? '화면 축소로 전환' : '전체화면으로 전환';
+  applyHeaderHeight();
+}
+fsBtn.onclick=async function(){
+  if(document.fullscreenElement) await exitFS(); else await enterFS();
+};
+document.addEventListener('fullscreenchange', syncFSLabel);
+syncFSLabel();
+
+/* ================= 실행/큐 & 이벤트 매핑 ================= */
+var eventPrograms = {};
+var queue = [];
+var queueBusy = false;
+var cancelToken = 0;
+
+function sendRaw(s){
+  if(!writeChar){
+    log('➡️(BLE 미연결) '+s);
+    return Promise.resolve();
+  }
+  return writeChar.writeValue(enc(s+'\n'))
+    .then(()=>{ log('➡️ '+s); })
+    .catch(e=>{ log('⚠️ 전송 실패: '+e); });
+}
+async function runList(list, localToken){
+  for(var i=0;i<list.length;i++){
+    var ins=list[i];
+    if(localToken !== cancelToken) return;
+    if(ins.type==='CMD'){
+      await sendRaw(ins.s);
+    }else if(ins.type==='W'){
+      var ms = (ins.args && ins.args[0]) ? ins.args[0] : 0;
+      if(ms>0) await new Promise(r=>setTimeout(r, ms));
+    }else if(ins.type==='FOR'){
+      for(var k=0;k<ins.count;k++){
+        if(localToken !== cancelToken) return;
+        await runList(ins.body, localToken);
+      }
+    }
+  }
+}
+async function processQueue(localToken){
+  if(queueBusy) return;
+  queueBusy = true;
+  try{
+    while(queue.length && localToken === cancelToken){
+      var item = queue.shift();
+      await runList(item.list, localToken);
+    }
+  }finally{
+    queueBusy = false;
+  }
+}
+
+function triggerEvent(key){
+  if(!isRunning) return;
+  var entry = eventPrograms[key];
+  if(!entry || !entry.list || !entry.list.length) return;
+  queue.push({list: entry.list});
+  log('▶ 이벤트 실행: "'+ (entry.label || key) + '"');
+  var myToken = cancelToken;
+  processQueue(myToken);
+}
+
+/* 테스트 실행 */
+function startTest(){
+  if(isRunning) return;
+  eventPrograms = buildEventPrograms();
+  cancelToken++; queue = [];
+  isFullscreenRun = false;
+  setRunning(true);
+  log('▶ 테스트 실행 준비 완료 (음성 명령 대기)');
+}
+
+/* 전체화면 실행 */
+var overlay = document.getElementById('playOverlay');
+async function startFullRun(){
+  if(isRunning) return;
+  eventPrograms = buildEventPrograms();
+  cancelToken++; queue = [];
+  isFullscreenRun = true;
+  setRunning(true);
+
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  try{
+    if(overlay.requestFullscreen) await overlay.requestFullscreen();
+  }catch(e){}
+  log('▶ 전체화면 실행 시작 (음성 명령 대기)');
+}
+
+/* 정지 */
+async function stopRun(){
+  cancelToken++; queue=[];
+  setRunning(false);
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  isFullscreenRun = false;
+  try{
+    if(document.fullscreenElement) await document.exitFullscreen();
+  }catch(e){}
+  try{
+    if(writeChar) writeChar.writeValue(enc('S\n'));
+  }catch(e){}
+}
+
+btnTest.onclick = ()=> { if(!isRunning) startTest(); };
+btnRun.onclick  = ()=> { if(!isRunning) startFullRun(); else stopRun(); };
+
+document.addEventListener('fullscreenchange', ()=>{
+  if (isFullscreenRun && !document.fullscreenElement){
+    stopRun();
+  }
+});
+document.addEventListener('keydown', (e)=>{
+  if (isFullscreenRun && e.key === 'Escape') stopRun();
+});
+
+/* ================= 음성 인식 ================= */
+var voiceBtn = document.getElementById('voiceBtn');
+var voiceStatus = document.getElementById('voiceStatus');
+var voiceText = document.getElementById('voiceText');
+
+var overlayVoiceBtn = document.getElementById('overlayVoiceBtn');
+var overlayVoiceStatus = document.getElementById('overlayVoiceStatus');
+var overlayVoiceText = document.getElementById('overlayVoiceText');
+
+var recognition = null;
+var recognizing = false;
+var listenTimer = null;
+var lastTranscript = '';
+
+function updateVoiceUI(state, msg){
+  // 패널 쪽
+  if(voiceStatus){
+    if(state === 'idle')      voiceStatus.textContent = '대기 중';
+    else if(state === 'listening') voiceStatus.textContent = '듣는 중... (최대 3초)';
+    else if(state === 'thinking')  voiceStatus.textContent = '인식 중...';
+    else if(state === 'done')      voiceStatus.textContent = '인식 완료';
+    else if(state === 'error')     voiceStatus.textContent = '오류';
+  }
+  // 전체화면 쪽
+  if(overlayVoiceStatus){
+    if(state === 'idle')      overlayVoiceStatus.textContent = '대기 중';
+    else if(state === 'listening') overlayVoiceStatus.textContent = '듣는 중... (최대 3초)';
+    else if(state === 'thinking')  overlayVoiceStatus.textContent = '인식 중...';
+    else if(state === 'done')      overlayVoiceStatus.textContent = '인식 완료';
+    else if(state === 'error')     overlayVoiceStatus.textContent = '오류';
+  }
+
+  if(typeof msg === 'string'){
+    if(voiceText) voiceText.textContent = msg;
+    if(overlayVoiceText) overlayVoiceText.textContent = msg;
+  }
+}
+
+function ensureSpeechRecognition(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    alert('이 브라우저는 음성 인식을 지원하지 않습니다.\n(Chrome / Edge 기반 브라우저를 사용해 주세요)');
+    return null;
+  }
+  if(!recognition){
+    recognition = new SR();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+
+    recognition.onstart = function(){
+      recognizing = true;
+      if(voiceBtn) voiceBtn.classList.add('listening');
+      if(overlayVoiceBtn) overlayVoiceBtn.classList.add('listening');
+      updateVoiceUI('listening', '지금 말해 주세요...');
+    };
+    recognition.onerror = function(e){
+      recognizing = false;
+      if(voiceBtn) voiceBtn.classList.remove('listening');
+      if(overlayVoiceBtn) overlayVoiceBtn.classList.remove('listening');
+      clearTimeout(listenTimer);
+      log('❌ 음성 인식 오류: '+ (e && e.error ? e.error : e));
+      updateVoiceUI('error', '음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
+    };
+    recognition.onresult = function(event){
+      var interim='';
+      var finalText='';
+      for(var i=0;i<event.results.length;i++){
+        var res = event.results[i];
+        if(res.isFinal) finalText += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      var display = finalText || interim;
+      if(display){
+        updateVoiceUI('listening', display);
+        lastTranscript = display;
+      }
+    };
+    recognition.onend = function(){
+      recognizing = false;
+      if(voiceBtn) voiceBtn.classList.remove('listening');
+      if(overlayVoiceBtn) overlayVoiceBtn.classList.remove('listening');
+      clearTimeout(listenTimer);
+      if(lastTranscript){
+        updateVoiceUI('done', lastTranscript);
+        handleVoiceCommand(lastTranscript);
+      }else{
+        updateVoiceUI('idle', '인식된 문장이 없습니다. 다시 시도해 주세요.');
+      }
+    };
+  }
+  return recognition;
+}
+
+function startVoiceRecognition(){
+  var rec = ensureSpeechRecognition();
+  if(!rec) return;
+  if(recognizing){
+    try{ rec.stop(); }catch(e){}
+    return;
+  }
+  lastTranscript = '';
+  try{
+    rec.start();
+    updateVoiceUI('listening', '지금 말해 주세요...');
+    listenTimer = setTimeout(function(){
+      try{ rec.stop(); }catch(e){}
+    }, 3000);
+  }catch(e){
+    log('⚠️ 음성 인식 시작 실패: '+e);
+    updateVoiceUI('error', '음성 인식을 시작할 수 없습니다.');
+  }
+}
+if(voiceBtn) voiceBtn.addEventListener('click', startVoiceRecognition);
+if(overlayVoiceBtn) overlayVoiceBtn.addEventListener('click', startVoiceRecognition);
+
+/* 전체화면에서 두 번 탭하면 종료 */
+(function(){
+  if(!overlay) return;
+  var lastTapTime = 0;
+  overlay.addEventListener('pointerdown', function(e){
+    var now = e.timeStamp || Date.now();
+    if(now - lastTapTime <= 300){
+      stopRun();
+      lastTapTime = 0;
+    }else{
+      lastTapTime = now;
+    }
+  }, {passive:true});
+  overlay.addEventListener('dblclick', function(){
+    stopRun();
+  }, {passive:true});
+})();
+
+/* 음성 결과 → 이벤트 매칭 */
+function handleVoiceCommand(text){
+  var key = normalizeTrigger(text);
+  if(!key){
+    log('🎙 인식 결과가 비어 있습니다.');
+    return;
+  }
+  log('🎙 인식 문장: "'+ text + '"');
+
+  if(!isRunning){
+    log('ℹ️ 아직 실행 모드가 아닙니다. [테스트] 또는 [실행] 버튼을 먼저 눌러 주세요.');
+    return;
+  }
+
+  var hits = [];
+  for(var k in eventPrograms){
+    if(!Object.prototype.hasOwnProperty.call(eventPrograms,k)) continue;
+    if(!k) continue;
+    if(key === k || key.indexOf(k) >= 0 || k.indexOf(key) >= 0){
+      hits.push(k);
+    }
+  }
+  if(!hits.length){
+    log('❔ "'+ text + '" 에 해당하는 이벤트 블록을 찾지 못했습니다.');
+    showOverlayPhrase(text, false);
+    return;
+  }
+  showOverlayPhrase(text, true);
+  hits.forEach(triggerEvent);
+}
+
+function showOverlayPhrase(text, matched){
+  if(!isFullscreenRun) return;
+  if(overlayVoiceText){
+    overlayVoiceText.textContent = text;
+  }
+}
+
+/* ================= 끝 ================= */
+</script>
+
+<script id="xrobo-hsplit-script">
+(function(){
+  var res = document.getElementById('hResizer');
+  var main = document.getElementById('main');
+  var right = document.getElementById('right');
+  if(!res || !main || !right) return;
+
+  var dragging = false;
+  var startX = 0;
+  var startW = 0;
+  var rafId = 0;
+  var maxW = 0;
+
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+  function computeMax(){
+    var rect = main.getBoundingClientRect();
+    var barW = res.getBoundingClientRect().width || 8;
+    maxW = Math.max(0, rect.width - barW);
+    return maxW;
+  }
+
+  function onDown(clientX){
+    dragging = true;
+    startX = clientX;
+    startW = right.getBoundingClientRect().width;
+    computeMax();
+    document.body.classList.add('hs-resizing');
+  }
+
+  function applyWidth(newW){
+    newW = clamp(newW, 0, maxW);
+    document.documentElement.style.setProperty('--rightW', newW + 'px');
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(function(){
+      try{
+        if (window.Blockly && typeof Blockly.svgResize==='function' && window.ws) {
+          Blockly.svgResize(ws);
+        }
+      }catch(e){}
+    });
+  }
+
+  function onMove(clientX){
+    if(!dragging) return;
+    var dx = clientX - startX;
+    var newW = startW - dx;
+    applyWidth(newW);
+  }
+
+  function onUp(){
+    dragging = false;
+    document.body.classList.remove('hs-resizing');
+  }
+
+  res.addEventListener('mousedown', function(e){ e.preventDefault(); onDown(e.clientX); });
+  window.addEventListener('mousemove', function(e){ onMove(e.clientX); });
+  window.addEventListener('mouseup', onUp);
+
+  res.addEventListener('touchstart', function(e){
+    if(!e.touches || !e.touches[0]) return;
+    e.preventDefault();
+    onDown(e.touches[0].clientX);
+  }, {passive:false});
+  window.addEventListener('touchmove', function(e){
+    if(!e.touches || !e.touches[0]) return;
+    onMove(e.touches[0].clientX);
+  }, {passive:false});
+  window.addEventListener('touchend', onUp);
+
+  document.body.classList.remove('panel-collapsed');
+
+  window.addEventListener('resize', function(){
+    var cur = right.getBoundingClientRect().width;
+    var mx = computeMax();
+    if(cur > mx) applyWidth(mx);
+  });
+})();
+
+/* === 파일 드롭다운 로직(저장/불러오기) === */
 (function(){
   var btn  = document.getElementById('fileBtn');
   var menu = document.getElementById('fileMenu');
@@ -1240,111 +1298,381 @@ function loadProject(){
     var cmd = t.getAttribute('data-cmd');
     if(!cmd) return;
     try{
-      if(cmd==='save'){ saveProject(); }
-      else if(cmd==='load'){ loadProject(); }
-      else if(cmd==='new'){
-        if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
-          ws.clear();
-          log('🆕 새 프로젝트');
-        }
-      }
+      if(cmd==='save'){ if(typeof saveProject==='function') saveProject(); }
+      else if(cmd==='load'){ if(typeof loadProject==='function') loadProject(); }
     }catch(_){}
     menu.classList.remove('show');
     menu.setAttribute('aria-hidden','true');
   });
 })();
-</script>
 
-<!-- ========== 토스트 + 필드 클릭 디버깅 (키보드 완전 차단) ========== -->
-<script>
+/* === 새로만들기 === */
 (function(){
-  const toastEl = document.getElementById('xroboToast');
-  const popupEl = document.getElementById('xroboFieldPopup');
-  const popTitle = popupEl ? popupEl.querySelector('.title') : null;
-  const popValue = popupEl ? popupEl.querySelector('.value') : null;
-  const popClose = popupEl ? popupEl.querySelector('.btnClose') : null;
-
-  function showToast(msg){
-    if(!toastEl) return;
-    toastEl.textContent = msg;
-    toastEl.style.opacity = '1';
-    toastEl.style.transform = 'translateX(-50%) translateY(-4px)';
-    clearTimeout(showToast._timer);
-    showToast._timer = setTimeout(()=>{
-      toastEl.style.opacity = '0';
-      toastEl.style.transform = 'translateX(-50%) translateY(0)';
-    }, 1200);
-  }
-  window.xroboShowToast = showToast;
-
-  function openPopup(kind, field){
-    if(!popupEl || !popTitle || !popValue) return;
-    popTitle.textContent = (kind === 'text') ? '텍스트 입력 필드' : '숫자 입력 필드';
-
-    let val = '';
+  var menu = document.getElementById('fileMenu');
+  if(!menu) return;
+  if(menu.__x_new_bound) return;
+  menu.__x_new_bound = true;
+  menu.addEventListener('click', function(e){
     try{
-      if(field && typeof field.getValue === 'function'){
-        val = String(field.getValue() ?? '');
-      }
-    }catch(e){}
-    popValue.textContent = val;
-
-    popupEl.style.display = 'flex';
-  }
-
-  if(popClose){
-    popClose.addEventListener('click', ()=>{ popupEl.style.display = 'none'; });
-  }
-  if(popupEl){
-    popupEl.addEventListener('click', (e)=>{
-      if(e.target === popupEl) popupEl.style.display = 'none';
-    });
-  }
-
-  function patch(){
-    if(!window.Blockly || !Blockly.FieldTextInput) return;
-    var TextProto = Blockly.FieldTextInput.prototype;
-    if(TextProto.__xrobo_no_keyboard_patched) return;
-
-    var NumberProto = Blockly.FieldNumber && Blockly.FieldNumber.prototype;
-
-    // 텍스트 필드 전용 후크
-    TextProto.showEditor_ = function(){
-      var block = this.getSourceBlock && this.getSourceBlock();
-      var isEventText = block && (block.type === 'xvoice_start' || block.type === 'xvoice_test');
-
-      if(isEventText){
-        showToast('텍스트 입력을 누르셨습니다.');
-        openPopup('text', this);
+      var cmd = e && e.target && e.target.getAttribute && e.target.getAttribute('data-cmd');
+      if(cmd !== 'new') return;
+      if (typeof ws !== 'undefined' && ws && typeof ws.clear === 'function'){
+        if(confirm('현재 프로젝트를 모두 지우고 새로 만들까요?')){
+          try{ ws.clear(); }catch(_){}
+          try{
+            if(typeof multiServoConfigs !== 'undefined' && multiServoConfigs &&
+               typeof multiServoConfigs.clear==='function') multiServoConfigs.clear();
+          }catch(_){}
+          try{ if(typeof refreshCodeDebounced === 'function') refreshCodeDebounced(); }catch(_){}
+          try{ if(typeof log === 'function') log('🆕 새 프로젝트'); }catch(_){}
+        }
       }else{
-        showToast('숫자 입력을 누르셨습니다.');
-        openPopup('number', this);
+        if(confirm('페이지를 새로고침하여 새로 시작할까요?')){
+          location.reload();
+        }
       }
-      // ★ 원래의 showEditor_를 호출하지 않음
-      // htmlInput을 만들지 않기 때문에 OS 키보드가 뜨지 않습니다.
-    };
-
-    // 숫자 필드(FieldNumber)
-    if(NumberProto){
-      NumberProto.showEditor_ = function(){
-        showToast('숫자 입력을 누르셨습니다.');
-        openPopup('number', this);
-        // 여기서도 원래 편집기를 열지 않습니다.
-      };
-    }
-
-    TextProto.__xrobo_no_keyboard_patched = true;
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', patch);
-  }else{
-    patch();
-  }
-  // Blockly 로딩 지연 대비
-  setTimeout(patch, 1000);
+    }catch(_){}
+  });
 })();
 </script>
 
+<script id="xrobo-kp4x4-v14-script">
+/* Android용 숫자 패드 + Blockly 숫자 필드 연동 */
+(function(){
+  if(!/Android/i.test(navigator.userAgent||'')) { return; }
+
+  'use strict';
+  const isAndroid = /Android/i.test(navigator.userAgent||'');
+  if(!isAndroid){ return; }
+  const hasPointer = 'PointerEvent' in window;
+
+  let pad, disp, grid;
+  let activeInput = null;   // 기존: servoModal 등의 <input>
+  let activeField = null;   // 추가: Blockly FieldNumber
+  let buffer = '';
+  let rafId = 0;
+  let lastAnchor = {x: window.innerWidth/2, y: 140};
+  let outsideBound = false;
+  let committing = false;
+  let lastPressLabel = '';
+  let lastPressTime = 0;
+  const PRESS_DEBOUNCE_MS = 160;
+
+  function safeEval(expr){
+    if(typeof expr!=='string') return NaN;
+    expr = expr.replace(/[^0-9+\-*/\s]/g,'').trim();
+    if(!expr) return NaN;
+    const tokens = expr.match(/(\d+|[+\-*/])/g) || [];
+    if(tokens.length===0) return NaN;
+    const values=[], ops=[];
+    let expectNum=true, unary=null;
+    function prec(op){ return (op==='*'||op==='/')?2:1; }
+    function apply(){
+      const op=ops.pop(), b=values.pop(), a=values.pop();
+      values.push(op==='+'?a+b: op==='-'?a-b: op==='*'?a*b: (b===0?0:Math.trunc(a/b)));
+    }
+    for(const tk of tokens){
+      if(/^\d+$/.test(tk)){
+        let v=parseInt(tk,10); if(unary==='-') v=-v; unary=null; values.push(v); expectNum=false;
+      }else{
+        if(expectNum){ if(tk==='+'||tk==='-') unary=tk; }
+        else{
+          while(ops.length && prec(ops[ops.length-1])>=prec(tk)) apply();
+          ops.push(tk); expectNum=true;
+        }
+      }
+    }
+    while(ops.length) apply();
+    return values.length? values[0]:NaN;
+  }
+  function dispatch(el, type){
+    try{ el.dispatchEvent(new Event(type, {bubbles:true})); }catch(_){}
+  }
+
+  function buildPad(){
+    if(pad) return pad;
+    pad = document.createElement('div');
+    pad.id = 'xrobo-kp4x4-v14';
+    pad.innerHTML =
+      '<div class="display" aria-live="polite"></div>'+
+      '<div class="grid" role="group" aria-label="숫자패드"></div>';
+    document.body.appendChild(pad);
+    disp = pad.querySelector('.display');
+    grid = pad.querySelector('.grid');
+
+    const layout = [
+      {t:'1'},{t:'2'},{t:'3'},{t:'←',cls:'back'},
+      {t:'4'},{t:'5'},{t:'6'},{t:'C',cls:'clear'},
+      {t:'7'},{t:'8'},{t:'9'},{t:'+',cls:'op'},
+      {t:'*',cls:'op'},{t:'0'},{t:'/',cls:'op'},{t:'-',cls:'op'},
+      {t:'확인',cls:'wide ok'},{t:'취소',cls:'wide cancel'}
+    ];
+    layout.forEach(k=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.textContent=k.t;
+      if(k.cls) k.cls.split(' ').forEach(c=>b.classList.add(c));
+      grid.appendChild(b);
+    });
+
+    const press = (label)=>{
+      const now = performance.now();
+      if(label === lastPressLabel && (now - lastPressTime) < PRESS_DEBOUNCE_MS){
+        return;
+      }
+      lastPressLabel = label; lastPressTime = now;
+
+      if(label==='확인'){ commit(); return; }
+      if(label==='취소'){ cancel(); return; }
+      if(label==='C'){ buffer=''; sync(); return; }
+      if(label==='←'){ buffer = buffer.slice(0, buffer.length-1); sync(); return; }
+      if(/^[0-9+\-*/]$/.test(label)){ buffer += label; sync(); return; }
+    };
+
+    function getButtonFromEvent(e){
+      if(e.type==='touchstart' && e.touches && e.touches[0]){
+        const t=e.touches[0];
+        const el=document.elementFromPoint(t.clientX, t.clientY);
+        return el && el.closest && el.closest('button');
+      }
+      return e.target && e.target.closest && e.target.closest('button');
+    }
+
+    const onPress = (e)=>{
+      const btn = getButtonFromEvent(e); if(!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      press(btn.textContent);
+    };
+
+    if(!grid.dataset.bound){
+      if(hasPointer){
+        grid.addEventListener('pointerdown', onPress, true);
+      }else if('ontouchstart' in window){
+        grid.addEventListener('touchstart', onPress, {passive:false, capture:true});
+      }else{
+        grid.addEventListener('mousedown', onPress, true);
+      }
+      grid.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+      grid.dataset.bound = '1';
+    }
+
+    const outside = (e)=>{
+      if(!pad.classList.contains('show')) return;
+      if(pad.contains(e.target)) return;
+      if(activeInput && e.target===activeInput) return;
+      commit();
+    };
+    if(!outsideBound){
+      if(hasPointer){
+        document.addEventListener('pointerdown', outside, true);
+      }else if('ontouchstart' in window){
+        document.addEventListener('touchstart', outside, {passive:false, capture:true});
+      }else{
+        document.addEventListener('mousedown', outside, true);
+      }
+      outsideBound = true;
+    }
+
+    return pad;
+  }
+  function showPad(){ buildPad().classList.add('show'); }
+  function hidePad(){ if(pad) pad.classList.remove('show'); }
+
+  function positionNearRect(r){
+    const br = pad.getBoundingClientRect();
+    const pw=br.width, ph=br.height;
+    const gap=8, vx=window.scrollX||0, vy=window.scrollY||0;
+    let left=r.right + gap + vx, top=r.top + vy;
+    if(left + pw > vx + innerWidth - 6){ left = r.left + vx - pw - gap; }
+    if(top + ph > vy + innerHeight - 6){ top = Math.max(vy+6, vy + innerHeight - ph - 6); }
+    if(top < vy + 6) top = vy + 6;
+    pad.style.left = left + 'px'; pad.style.top = top + 'px';
+  }
+  function positionNearInput(input){ positionNearRect(input.getBoundingClientRect()); }
+  function positionNearPoint(x,y){ positionNearRect({left:x, right:x, top:y, bottom:y, width:0, height:0}); }
+
+  function positionNearField(field){
+    try{
+      const root = field.getClickTarget_ ? field.getClickTarget_()
+                  : (field.getSvgRoot ? field.getSvgRoot() : null);
+      if(root && root.getBoundingClientRect){
+        positionNearRect(root.getBoundingClientRect());
+        return true;
+      }
+    }catch(_){}
+    return false;
+  }
+
+  function startFollowInput(input){
+    cancelAnimationFrame(rafId);
+    const tick=()=>{
+      if(activeInput){
+        positionNearInput(input);
+        rafId=requestAnimationFrame(tick);
+      }
+    };
+    tick();
+  }
+  function stopFollow(){ cancelAnimationFrame(rafId); rafId=0; }
+
+  function sync(){
+    if(disp) disp.textContent = buffer;
+    if(activeInput){
+      activeInput.value = buffer;
+      dispatch(activeInput,'input');
+    }
+  }
+
+  function evaluateAndClamp(raw, inputEl){
+    let num = safeEval(String(raw||'').trim());
+    if(!Number.isFinite(num)) return { ok:false, val:String(raw||'') };
+    const min = Number(inputEl?.getAttribute('min'));
+    const max = Number(inputEl?.getAttribute('max'));
+    if(Number.isFinite(min)) num = Math.max(min, num);
+    if(Number.isFinite(max)) num = Math.min(max, num);
+    return { ok:true, val:String(num) };
+  }
+
+  function commit(){
+    if(committing) return;
+    committing = true;
+    try{
+      if(activeField){
+        // Blockly 숫자 필드: FieldNumber가 자체 검증/클램프
+        try{
+          activeField.setValue(buffer);
+        }catch(_){}
+        activeField = null;
+      }else if(activeInput){
+        const { ok, val } = evaluateAndClamp(buffer, activeInput);
+        activeInput.value = val;
+        dispatch(activeInput,'input');
+        dispatch(activeInput,'change');
+        activeInput = null;
+      }
+      stopFollow(); hidePad();
+    }finally{
+      committing = false;
+    }
+  }
+
+  function cancel(){
+    activeField = null;
+    activeInput = null;
+    stopFollow(); hidePad();
+  }
+
+  function openForInput(input){
+    activeInput = input;
+    activeField = null;
+    buffer = String(input.value||'');
+    if(isAndroid){
+      input.setAttribute('readonly', 'readonly');
+      input.setAttribute('inputmode','none');
+      input.addEventListener('touchstart', ev=>{ ev.preventDefault(); ev.stopPropagation(); }, {capture:true, passive:false});
+      setTimeout(()=>{ try{ input.blur(); }catch(_){ } }, 0);
+    }
+    input.setAttribute('pattern','[0-9+\\-*/]*');
+    input.setAttribute('autocomplete','off');
+    input.setAttribute('autocorrect','off');
+    input.setAttribute('autocapitalize','off');
+    input.setAttribute('spellcheck','false');
+
+    showPad();
+    positionNearInput(input);
+    startFollowInput(input);
+    sync();
+  }
+
+  // ★ Blockly 숫자 필드용: FieldNumber에 직접 연결
+  function openForField(field){
+    activeField = field;
+    activeInput = null;
+    try{
+      buffer = String(field.getValue ? field.getValue() : '');
+    }catch(_){
+      buffer = '';
+    }
+    showPad();
+    if(!positionNearField(field)){
+      positionNearPoint(lastAnchor.x, lastAnchor.y);
+    }
+    if(disp) disp.textContent = buffer;
+  }
+
+  /* Blockly의 blocklyHtmlInput 은 그대로 OS 키보드 사용,
+     servoModal / boardStage 숫자 입력만 숫자패드 사용 */
+  document.addEventListener('focusin', function(e){
+    const t = e.target;
+    if(!t) return;
+
+    // Blockly 텍스트 입력은 건드리지 않음 (이벤트 블록 포함)
+    if(t.classList &&
+       (t.classList.contains('blocklyHtmlInput') ||
+        t.classList.contains('blocklyHtmlTextInput'))){
+      return; // 안드로이드 기본 키보드
+    }
+
+    // servo 관련 입력만 숫자패드 사용 (기존 기능 유지)
+    try{
+      const uaOk = /Android/i.test(navigator.userAgent||'');
+      if(uaOk && t.matches &&
+         t.matches('#servoModal .speedbox input, #boardStage .speedbox input')){
+        try{
+          t.setAttribute('inputmode','none');
+          t.setAttribute('autocomplete','off');
+          t.setAttribute('autocorrect','off');
+        }catch(_){}
+        try{
+          t.setAttribute('readonly','readonly');
+          setTimeout(()=>{ try{ t.removeAttribute('readonly'); }catch(_){ } }, 0);
+        }catch(_){}
+        openForInput(t);
+        const onBlur = ()=>{ try{ commit(); }catch(_){ cancel(); } t.removeEventListener('blur', onBlur); };
+        t.addEventListener('blur', onBlur);
+      }
+    }catch(_){}
+  }, true);
+
+  /* 마지막 터치 위치 저장 (블록 숫자 필드 위치가 잘 안 잡힐 때 대비) */
+  (function(){
+    const root = document.getElementById('blocklyDiv') || document.body;
+    const savePt = (e)=>{ lastAnchor = {x:e.clientX, y:e.clientY}; };
+    if(hasPointer) root.addEventListener('pointerdown', savePt, true);
+    else{
+      root.addEventListener('mousedown', savePt, true);
+      root.addEventListener('touchstart', (e)=>{
+        if(e.touches&&e.touches[0]) lastAnchor={x:e.touches[0].clientX, y:e.touches[0].clientY};
+      }, {capture:true, passive:true});
+    }
+  })();
+
+  /* === Blockly FieldNumber를 숫자패드로 연결 === */
+  function patchBlocklyNumber(){
+    if(!window.Blockly || !Blockly.FieldNumber) return;
+    const FN = Blockly.FieldNumber;
+    const proto = FN.prototype;
+    if(proto.__xrobo_kp4x4_patched) return;
+    proto.__xrobo_kp4x4_patched = true;
+
+    const origShow = proto.showEditor_;
+    proto.__xrobo_kp4x4_origShowEditor = origShow;
+
+    proto.showEditor_ = function(){
+      // 숫자 필드는 항상 우리 숫자패드 사용
+      openForField(this);
+    };
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', patchBlocklyNumber);
+  }else{
+    patchBlocklyNumber();
+  }
+  // Blockly 로딩 딜레이 대비
+  setTimeout(patchBlocklyNumber, 800);
+
+})();
+</script>
 </body>
 </html>
